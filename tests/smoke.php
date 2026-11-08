@@ -43,6 +43,8 @@ function wp_json_encode( $value ) { return json_encode( $value ); }
 function wp_salt( $scheme ) { return 'test-only-salt-' . $scheme; }
 function is_wp_error( $value ) { return $value instanceof WP_Error; }
 function wp_remote_request( $url, $args ) { $GLOBALS['request'] = array( $url, $args ); return $GLOBALS['response']; }
+function wp_remote_get( $url, $args ) { $GLOBALS['profile_request'] = array( $url, $args ); return $GLOBALS['profile_response']; }
+function wp_remote_post( $url, $args ) { $GLOBALS['token_request'] = array( $url, $args ); return $GLOBALS['token_response']; }
 function wp_remote_retrieve_body( $response ) { return $response['body']; }
 function wp_remote_retrieve_response_code( $response ) { return $response['code']; }
 function get_post( $id ) { return $GLOBALS['test_post'] ?? null; }
@@ -53,7 +55,10 @@ function get_transient( $key ) { return $GLOBALS['transients'][ $key ] ?? false;
 function delete_transient( $key ) { unset( $GLOBALS['transients'][ $key ] ); }
 function delete_option( $key ) { unset( $GLOBALS['options'][ $key ] ); return true; }
 function wp_safe_redirect( $url ) { throw new RuntimeException( 'redirect: ' . $url ); }
+function wp_redirect( $url, $status, $x_redirect_by ) { $GLOBALS['external_redirect'] = $url; throw new RuntimeException( 'external redirect' ); }
+function wp_die( $message ) { throw new RuntimeException( 'die: ' . $message ); }
 function wp_generate_password( $length, $special, $extra ) { return str_repeat( 'a', $length ); }
+function wp_basename( $path ) { return basename( $path ); }
 function wp_http_validate_url( $url ) { return filter_var( $url, FILTER_VALIDATE_URL ); }
 function add_option( $key, $value, $deprecated, $autoload ) {
 	if ( array_key_exists( $key, $GLOBALS['options'] ) ) { return false; }
@@ -84,7 +89,18 @@ function wp_nonce_field( ...$args ) {}
 function checked( $value ) { if ( $value ) { echo 'checked'; } }
 function wp_date( $format, $time, $timezone ) { return ( new DateTimeImmutable( '@' . $time ) )->setTimezone( $timezone )->format( $format ); }
 function admin_url( $path ) { return 'https://example.test/wp-admin/' . $path; }
-function add_query_arg( $key, $value, $url ) { return $url . '&' . $key . '=' . $value; }
+function add_query_arg( $key, $value = null, $url = null ) {
+	if ( is_array( $key ) ) {
+		$url = $value;
+		$arguments = $key;
+	} else {
+		$arguments = array( $key => $value );
+	}
+	if ( null === $url ) {
+		$url = '';
+	}
+	return $url . ( str_contains( $url, '?' ) ? '&' : '?' ) . http_build_query( $arguments );
+}
 function get_edit_post_link( $id ) { return admin_url( 'post.php?post=' . $id ); }
 function get_post_status_object( $status ) { return (object) array( 'label' => $status ); }
 function paginate_links( $args ) { return ''; }
@@ -242,13 +258,22 @@ $accounts_page = ob_get_clean();
 expect( str_contains( $accounts_page, 'wsp-accounts-grid' ) && str_contains( $accounts_page, 'wsp_facebook_connect' ) && str_contains( $accounts_page, 'wsp_facebook_disconnect' ), 'Facebook bağlantı ve kaldırma formları korunmalı' );
 expect( str_contains( $accounts_page, 'Kayıtlı Sayfa: Sayfa' ) && ! str_contains( $accounts_page, 'secret-token' ), 'Hesap bilgisi belirteç gösterilmeden sunulmalı' );
 expect( str_contains( $accounts_page, 'güncel durumu burada kontrol edilmez' ), 'Bağlantı durumu güncel olarak sunulmamalı' );
-foreach ( array( 'x', 'linkedin', 'medium', 'substack' ) as $platform ) {
+foreach ( array( 'x', 'linkedin' ) as $platform ) {
 	$_GET['platform'] = $platform;
 	ob_start();
 	wsp_accounts_page();
 	$accounts_page = ob_get_clean();
-	expect( str_contains( $accounts_page, wsp_platforms()[ $platform ] ) && str_contains( $accounts_page, 'Bağlantı henüz kullanılamıyor' ), 'Desteklenmeyen platform durumu gösterilmeli: ' . $platform );
-	expect( ! str_contains( $accounts_page, 'wsp_facebook_connect' ) && ! str_contains( $accounts_page, 'page_token' ), 'Başka platformda Facebook formu gösterilmemeli' );
+	expect( str_contains( $accounts_page, wsp_platforms()[ $platform ] ) && str_contains( $accounts_page, 'OAuth Redirect URI' ), 'OAuth uygulaması ve dönüş adresi gösterilmeli: ' . $platform );
+	expect( str_contains( $accounts_page, 'wsp_oauth_save_app' ) && ! str_contains( $accounts_page, 'wsp_facebook_connect' ), 'Platforma özel OAuth formu olmalı: ' . $platform );
+	expect( ! str_contains( $accounts_page, 'wsp_oauth_start' ), 'Uygulama bilgileri olmadan giriş başlamamalı: ' . $platform );
+}
+foreach ( array( 'medium', 'substack' ) as $platform ) {
+	$_GET['platform'] = $platform;
+	ob_start();
+	wsp_accounts_page();
+	$accounts_page = ob_get_clean();
+	expect( str_contains( $accounts_page, wsp_platforms()[ $platform ] ) && str_contains( $accounts_page, 'Resmi hesap bağlantısı desteklenmiyor' ), 'Desteklenmeyen platform durumu gösterilmeli: ' . $platform );
+	expect( ! str_contains( $accounts_page, 'page_token' ) && ! str_contains( $accounts_page, 'client_secret' ), 'Desteklenmeyen platform için kimlik bilgisi alınmamalı' );
 }
 $_GET['platform'] = 'gecersiz';
 $GLOBALS['ssl'] = false;
@@ -257,6 +282,125 @@ wsp_accounts_page();
 $accounts_page = ob_get_clean();
 expect( str_contains( $accounts_page, 'HTTPS gereklidir' ) && ! str_contains( $accounts_page, 'name="page_token"' ), 'Geçersiz platform varsayılan Facebook ekranına dönmeli; HTTPS yoksa form gösterilmemeli' );
 $GLOBALS['ssl'] = true;
+$GLOBALS['nonce_valid'] = true;
+
+$_POST = array( 'platform' => 'linkedin', 'client_id' => 'linkedin-client', 'client_secret' => 'linkedin-secret' );
+try {
+	wsp_oauth_save_app();
+} catch ( RuntimeException $error ) {
+	expect( str_starts_with( $error->getMessage(), 'redirect:' ), 'Uygulama bilgileri kaydedilmeli' );
+}
+$linkedin_app = wsp_oauth_apps()['linkedin'];
+expect( 'linkedin-client' === $linkedin_app['client_id'] && 'linkedin-secret' === wsp_decrypt_secret( $linkedin_app['client_secret'] ), 'Client secret şifrelenmiş olarak saklanmalı' );
+$_POST['client_secret'] = '';
+try {
+	wsp_oauth_save_app();
+} catch ( RuntimeException $error ) {}
+expect( $linkedin_app['client_secret'] === wsp_oauth_apps()['linkedin']['client_secret'], 'Boş gizli alan mevcut anahtarı korumalı' );
+expect( 'https://example.test/wp-admin/admin-post.php' === wsp_oauth_callback_url( 'linkedin' ), 'Callback yönetici oturumunu koruyan sabit admin-post URL kullanmalı' );
+
+$GLOBALS['options']['wsp_oauth_apps']['x'] = array(
+	'client_id' => 'x-client',
+	'client_secret' => wsp_encrypt_secret( 'x-secret' ),
+);
+$_POST = array( 'platform' => 'x' );
+try {
+	wsp_oauth_start();
+	expect( false, 'OAuth yönlendirmesi başlamalı' );
+} catch ( RuntimeException $error ) {
+	expect( 'external redirect' === $error->getMessage(), 'Kullanıcı X OAuth sayfasına yönlendirilmeli' );
+}
+$authorize = array();
+parse_str( (string) parse_url( $GLOBALS['external_redirect'], PHP_URL_QUERY ), $authorize );
+expect( 'https://x.com/i/oauth2/authorize' === parse_url( $GLOBALS['external_redirect'], PHP_URL_SCHEME ) . '://' . parse_url( $GLOBALS['external_redirect'], PHP_URL_HOST ) . parse_url( $GLOBALS['external_redirect'], PHP_URL_PATH ), 'X resmi HTTPS OAuth uç noktasına gidilmeli' );
+expect( 'S256' === $authorize['code_challenge_method'] && isset( $authorize['code_challenge'], $authorize['state'] ), 'X PKCE ve state göndermeli' );
+$oauth_state_key = 'wsp_oauth_state_' . hash( 'sha256', $authorize['state'] );
+$oauth_state = $GLOBALS['transients'][ $oauth_state_key ];
+expect( 'x' === $oauth_state['platform'] && 7 === $oauth_state['user_id'], 'OAuth state kullanıcıya ve platforma bağlanmalı' );
+$verifier = wsp_decrypt_secret( $oauth_state['verifier'] );
+expect( ! is_wp_error( $verifier ) && $verifier !== $oauth_state['verifier'], 'PKCE verifier transient içinde şifreli saklanmalı' );
+expect( hash_equals( $authorize['code_challenge'], rtrim( strtr( base64_encode( hash( 'sha256', $verifier, true ) ), '+/', '-_' ), '=' ) ), 'X PKCE challenge verifier ile eşleşmeli' );
+
+$_SERVER['PHP_SELF'] = '/wp-admin/admin-post.php';
+$_GET = array( 'state' => $authorize['state'], 'code' => 'test-authorization-code' );
+$GLOBALS['token_response'] = array( 'code' => 200, 'body' => '{"access_token":"x-access","refresh_token":"x-refresh","expires_in":7200}' );
+$GLOBALS['profile_response'] = array( 'code' => 200, 'body' => '{"data":{"id":"x-123","name":"X Tester","username":"xuser"}}' );
+try {
+	wsp_oauth_maybe_handle_callback();
+	expect( false, 'OAuth callback hesaba bağlanmalı' );
+} catch ( RuntimeException $error ) {
+	expect( str_starts_with( $error->getMessage(), 'redirect:' ), 'Başarılı OAuth callback hesaba yönlendirmeli' );
+}
+expect( false === get_transient( $oauth_state_key ), 'OAuth state callback sonrasında tek kullanımlık olmalı' );
+expect( 'authorization_code' === $GLOBALS['token_request'][1]['body']['grant_type'] && 'test-authorization-code' === $GLOBALS['token_request'][1]['body']['code'], 'Authorization code token karşılığında değiştirilmeli' );
+expect( 'Basic ' . base64_encode( 'x-client:x-secret' ) === $GLOBALS['token_request'][1]['headers']['Authorization'], 'X istemci doğrulaması token isteğinde kullanılmalı' );
+expect( 'x-client' === $GLOBALS['token_request'][1]['body']['client_id'] && isset( $GLOBALS['token_request'][1]['body']['code_verifier'] ), 'X token isteği client ID ve PKCE verifier içermeli' );
+$x_account = get_option( 'wsp_oauth_accounts' )['x'];
+expect( 'X Tester' === $x_account['profile']['name'] && '@xuser' === '@' . $x_account['profile']['username'], 'X hesap profili doğrulanıp kaydedilmeli' );
+expect( 'x-access' === wsp_oauth_account( 'x' )['access_token'] && 'x-refresh' === wsp_oauth_account( 'x' )['refresh_token'], 'X belirteçleri şifreli saklanıp okunmalı' );
+expect( ! str_contains( $x_account['access_token'], 'x-access' ) && ! str_contains( $x_account['refresh_token'], 'x-refresh' ), 'OAuth belirteçleri veritabanında şifreli olmalı' );
+$_POST = array( 'platform' => 'x' );
+$GLOBALS['profile_response'] = array( 'code' => 200, 'body' => '{"data":{"id":"x-123","name":"X Tester","username":"xuser"}}' );
+try {
+	wsp_oauth_test();
+	expect( false, 'X bağlantı testi tamamlanmalı' );
+} catch ( RuntimeException $error ) {
+	expect( str_starts_with( $error->getMessage(), 'redirect:' ), 'X bağlantı testi sonuç ekranına dönmeli' );
+}
+expect( str_contains( get_transient( 'wsp_oauth_notice_7' )['message'], '@xuser' ), 'X bağlantı testi kullanıcı profilini bildirmeli' );
+$GLOBALS['options']['wsp_oauth_accounts']['x']['expires_at'] = 1;
+$GLOBALS['token_response'] = array( 'code' => 200, 'body' => '{"access_token":"x-refreshed","refresh_token":"x-refresh-2","expires_in":3600}' );
+$refreshed_account = wsp_oauth_account( 'x' );
+expect( 'refresh_token' === $GLOBALS['token_request'][1]['body']['grant_type'] && 'x-refresh' === $GLOBALS['token_request'][1]['body']['refresh_token'], 'Süresi dolan X hesabı refresh token ile yenilenmeli' );
+expect( 'x-refreshed' === $refreshed_account['access_token'] && 'x-refresh-2' === $refreshed_account['refresh_token'], 'Yenilenen X tokenları döndürülmeli ve saklanmalı' );
+
+$GLOBALS['profile_response'] = array( 'code' => 200, 'body' => '{"sub":"li-123","name":"LinkedIn Tester"}' );
+$profile = wsp_oauth_profile( 'linkedin', 'li-access' );
+expect( 'li-123' === $profile['id'] && 'LinkedIn Tester' === $profile['name'], 'LinkedIn OpenID Connect profili doğrulanmalı' );
+$GLOBALS['options']['wsp_oauth_apps']['linkedin']['client_secret'] = wsp_encrypt_secret( 'linkedin-secret' );
+$_POST = array( 'platform' => 'linkedin' );
+try {
+	wsp_oauth_start();
+	expect( false, 'LinkedIn OAuth yönlendirmesi başlamalı' );
+} catch ( RuntimeException $error ) {
+	expect( 'external redirect' === $error->getMessage(), 'Kullanıcı LinkedIn OAuth sayfasına yönlendirilmeli' );
+}
+$linkedin_authorize = array();
+parse_str( (string) parse_url( $GLOBALS['external_redirect'], PHP_URL_QUERY ), $linkedin_authorize );
+expect( 'https://www.linkedin.com/oauth/v2/authorization' === parse_url( $GLOBALS['external_redirect'], PHP_URL_SCHEME ) . '://' . parse_url( $GLOBALS['external_redirect'], PHP_URL_HOST ) . parse_url( $GLOBALS['external_redirect'], PHP_URL_PATH ), 'LinkedIn resmi HTTPS OAuth uç noktasına gidilmeli' );
+expect( ! isset( $linkedin_authorize['code_challenge'] ) && str_contains( $linkedin_authorize['scope'], 'w_member_social' ), 'LinkedIn yetki isteği gerekli paylaşım kapsamını istemeli' );
+$_GET = array( 'state' => $linkedin_authorize['state'], 'code' => 'linkedin-code' );
+$GLOBALS['token_response'] = array( 'code' => 200, 'body' => '{"access_token":"li-access","expires_in":3600}' );
+$GLOBALS['profile_response'] = array( 'code' => 200, 'body' => '{"sub":"li-123","name":"LinkedIn Tester"}' );
+try {
+	wsp_oauth_callback();
+	expect( false, 'LinkedIn OAuth callback hesaba bağlanmalı' );
+} catch ( RuntimeException $error ) {
+	expect( str_starts_with( $error->getMessage(), 'redirect:' ), 'Başarılı LinkedIn callback hesaba yönlendirmeli' );
+}
+expect( 'linkedin-client' === $GLOBALS['token_request'][1]['body']['client_id'] && 'linkedin-secret' === $GLOBALS['token_request'][1]['body']['client_secret'], 'LinkedIn token isteği uygulama bilgilerini kullanmalı' );
+expect( 'li-123' === get_option( 'wsp_oauth_accounts' )['linkedin']['profile']['id'], 'LinkedIn profili doğrulanıp kaydedilmeli' );
+$_POST = array( 'platform' => 'linkedin' );
+$GLOBALS['profile_response'] = array( 'code' => 200, 'body' => '{"sub":"li-123","name":"LinkedIn Tester"}' );
+try {
+	wsp_oauth_test();
+	expect( false, 'LinkedIn bağlantı testi tamamlanmalı' );
+} catch ( RuntimeException $error ) {}
+expect( str_contains( get_transient( 'wsp_oauth_notice_7' )['message'], 'LinkedIn Tester' ), 'LinkedIn bağlantı testi profilini bildirmeli' );
+$_GET = array( 'page' => 'wsp-accounts', 'platform' => 'linkedin' );
+ob_start();
+wsp_accounts_page();
+$linkedin_page = ob_get_clean();
+expect( str_contains( $linkedin_page, 'Doğrulanan hesap: LinkedIn Tester (li-123)' ), 'LinkedIn profil ekranı kullanıcı kimliğini doğru göstermeli' );
+$_POST = array( 'platform' => 'linkedin' );
+try {
+	wsp_oauth_disconnect();
+	expect( false, 'LinkedIn bağlantısı kaldırılmalı' );
+} catch ( RuntimeException $error ) {
+	expect( str_starts_with( $error->getMessage(), 'redirect:' ), 'Bağlantı kaldırma sonrası yönlendirmeli' );
+}
+expect( ! isset( get_option( 'wsp_oauth_accounts' )['linkedin'] ), 'LinkedIn tokenları yerelden silinmeli' );
+expect( 'linkedin-client' === wsp_oauth_apps()['linkedin']['client_id'], 'Bağlantıyı kaldırmak geliştirici uygulamasını silmemeli' );
 
 $GLOBALS['posts'] = array( $post );
 $_GET = array( 'month' => '2026-11' );

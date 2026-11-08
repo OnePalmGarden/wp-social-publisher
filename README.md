@@ -1,10 +1,12 @@
 # WP Social Publisher
 
-WordPress yazıları için Twitter / X, LinkedIn, Facebook, Medium ve Substack paylaşım taslakları hazırlayan deneme eklentisi.
+WordPress yazıları için Twitter / X, LinkedIn, Facebook, Medium ve Substack paylaşım taslakları hazırlayan eklenti.
 
-## Önemli: Bu bir önizleme sürümüdür
+## Bu sürümde
 
-Sürüm 0.4.1, Facebook Sayfasına tek tek ve açık onayla metin + bağlantı gönderme denemesi içerir. Otomatik gönderim kuyruğu çalıştırmaz; plan tarihi yalnızca WordPress'te saklanır ve takvimde gösterilir. Diğer platformlarla hesap bağlantısı veya gerçek gönderim henüz yoktur. Facebook bağlantısı, WordPress yönetiminde bir **Sayfa erişim belirteci** gerektirir; kişisel Facebook şifrenizi veya belirtecinizi sohbet üzerinden paylaşmayın.
+Sürüm 0.5.0, X ve LinkedIn kullanıcı hesapları için resmi OAuth 2.0 giriş ve profil doğrulaması sunar; Facebook Sayfası bağlantısı önceki Sayfa erişim belirteci formuyla sürer. Kimlik doğrulama, bir hesabın yazı paylaşma erişimine sahip olduğunu garanti etmez. Eklenti hiçbir platforma otomatik gönderim yapmaz; Facebook'taki tekil gönderi akışı ayrıca kullanıcı onayı ister. Planlanan tarihler yalnızca WordPress'te saklanır ve takvimde listelenir.
+
+Medium ve Substack için şu an desteklenen resmi OAuth bağlantısı bulunmadığından eklenti parola istemez veya tarayıcı otomasyonu kullanmaz. İleride platformların desteklediği resmi bir yayınlama yöntemi sunulursa bu alan güncellenebilir.
 
 ## Kurulum ve güncelleme
 
@@ -29,35 +31,54 @@ Güncellemeden önce sitenizin yedeğini alın. Mevcut yazıların platform seç
 
 İçerik, URL ve etiket alanlarının boş olmayanları paylaşım metninde sırasıyla aralarında boş satır olacak şekilde birleştirilir. Şablon ekranındaki canlı önizleme örnek yazı verileri kullanır; gerçek yazıya ait önizleme yazı düzenleme ekranındaki taslak kutusunda görüntülenir.
 
-Bir yazının düzenleme ekranındaki **Sosyal paylaşım taslağı** kutusunda hedef platformları seçin. Yazıya özel metin alanı boşsa o platformun varsayılan şablonu, doluysa bu özel metin kullanılır. Özel metin de aynı yer tutucuları destekler. Önizleme en son kaydedilen yazı bilgilerini gösterir; değişiklikleri kaydedip düzenleyiciyi yeniden açarak kontrol edin. Varsayılan şablon daha sonra değiştirilirse özel metni olmayan yazıların önizlemesi de değişir.
+Yazı kutusundaki yazıya özel metin, varsayılan şablonun tamamının yerine kullanılır. Özel metni boş bırakırsanız varsayılan şablon kullanılır. Özel metin de aynı yer tutucuları destekler.
 
 Yazının **öne çıkan görseli** eklenti tarafından Facebook'a ayrı olarak yüklenmez; Facebook, bağlantı önizlemesini kendi kurallarına göre oluşturabilir. Platform sırası Twitter / X, LinkedIn, Facebook, Medium ve Substack'tir. Önceki sürümdeki Instagram tercihi yeni sürüm arayüzünde gösterilmez; mevcut yazı verileri otomatik olarak silinmez.
 
-### X karakter sayacı
+## X karakter sayacı
 
 Yazının Twitter / X bölümünde tüm oluşturulmuş mesajın Unicode karakter sayısı ve **140 karakterlik kişisel hedef** gösterilir. Yazıya özel metni değiştirince sayaç ve o alanın önizlemesi canlı güncellenir; başlık, özet, bağlantı ve etiketler en son kaydedilmiş yazı bilgileridir. Kaydedip düzenleyiciyi yeniden açarak güncel yazı bilgileriyle kontrol edin.
 
-Bu bir tahmindir: X, bağlantıları ve bazı Unicode karakterlerini farklı ağırlıklarla hesaplayabilir. Örneğin emojiler birden çok Unicode karakterinden oluşabilir. Gösterge, X'in gerçek kabul sınırını doğrulamaz ve hiçbir metni otomatik olarak kısaltmaz.
+Bu bir tahmindir: X, bağlantıları ve bazı Unicode karakterlerini farklı ağırlıklarla hesaplayabilir. Gösterge, X'in gerçek kabul sınırını doğrulamaz ve hiçbir metni otomatik olarak kısaltmaz.
 
-## Facebook Sayfasına deneme gönderisi
+## Hesapları bağlama ve bağlantıyı test etme
 
-1. Meta for Developers'da bir uygulama oluşturun ve **Graph API Explorer** üzerinden o uygulamayı seçin. Meta arayüzü zamanla değişebilir.
-2. Kendi kullanıcı hesabınız için gerekli Sayfa izinleriyle bir kullanıcı belirteci oluşturun. Meta, Sayfa listeleme ve gönderme için genellikle `pages_show_list`, `pages_read_engagement` ve `pages_manage_posts` izinlerini ve uygun uygulama/Sayfa rollerini gerektirir. Geliştirme modundaki uygulamalarda test hesabının uygulamada uygun rolü olmalıdır; başkalarının hesaplarına erişim için Meta incelemesi gerekebilir.
-3. Explorer'da `GET /me/accounts?fields=id,name,access_token` isteğiyle yönettiğiniz Sayfaları listeleyin. İstediğiniz Sayfanın `id` ve `access_token` değerlerini kullanın. Bu yanıtta gizli belirteçler bulunur; ekran görüntüsünü veya değerleri kimseyle paylaşmayın.
-4. HTTPS üzerinden WordPress yönetiminde **Social Publisher → Accounts** ekranında soldan **Facebook** seçin ve Sayfa kimliğini ve **Sayfa** erişim belirtecini girin. Uygulama belirtecin sahibinin Sayfa kimliğiyle eşleştiğini doğrular; bu kontrol gönderme iznini garanti etmez. Süresi biten veya iptal edilen belirteçler yeniden girilmelidir. Twitter / X, LinkedIn, Medium ve Substack bölümleri bilgilendirme ekranlarıdır; hesap bağlantısı henüz desteklenmez.
-5. Şifresiz, herkese açık yayımlanmış bir yazı hazırlayın. Facebook özel metni boşsa Facebook şablonu kullanılır; doluysa özel metin kullanılır.
-6. **Social Publisher → Share Now** ekranında yazıyı seçin. Gösterilen mesajı, bağlantıyı ve hedef Sayfayı kontrol edin. Yalnızca **Onayla ve Facebook’ta paylaş** düğmesi gerçek gönderim başlatır. Yazı seçimi, plan tarihi ve yazıyı yayımlamak kendiliğinden gönderim başlatmaz.
+**Social Publisher → Accounts** ekranında soldan Twitter / X, LinkedIn veya Facebook seçin. Tüm parola, gizli anahtar ve belirteç girişleri yalnızca HTTPS üzerindeki WordPress yönetim panelinde yapılmalıdır. Bunları sohbet, e-posta, ekran görüntüsü veya genel depoda paylaşmayın.
 
-Bir onay tek kullanımlıktır; ağ hatası veya beklenmedik Meta yanıtı gönderimin sonucunu belirsiz bırakabilir. Tekrar denemeden önce mutlaka Facebook Sayfasını kontrol edin. Kalıcı gönderim geçmişi henüz yoktur. İlk sürüm bağlantısının gerçek Meta ortamında ve sitenizde çalışması ayrıca doğrulanmalıdır.
+### Twitter / X
 
-Belirteç veritabanında OpenSSL AES-256-GCM ile şifrelenir; anahtar WordPress güvenlik anahtarlarından türetilir. Bu, veritabanı yedeğinde düz metni gizler ancak sunucu/WordPress anahtarlarıyla birlikte ele geçirilmesini önlemez. Yönetici ve sunucu erişimini koruyun; WordPress anahtarları değişirse yeniden bağlayın. Bağlantıyı kaldırmak yerel belirteci siler; Meta'da yetkiyi ayrıca iptal etmek gerekebilir. OpenSSL ve HTTPS gereklidir.
+1. X Developer Portal'da uygulama oluşturun ve **OAuth 2.0 Authorization Code Flow with PKCE** kullanan **Web App / Confidential Client** yapılandırın.
+2. Eklentide Twitter / X hesabını seçin. Gösterilen **OAuth Redirect URI** adresini X uygulamasındaki callback listesine aynen ekleyin.
+3. X'in verdiği **Client ID** ve **Client Secret** değerlerini eklentiye girip kaydedin.
+4. **Twitter / X ile güvenli giriş** düğmesine basıp X'te yetkilendirin. Dönüşte kullanıcı profili doğrulanır ve hesap WordPress'e kaydedilir.
+5. **Bağlantıyı test et** düğmesi profili yeniden API'den okur. Bu sürümde X'e gönderi yayınlanmaz.
+
+Eklenti `users.read`, `tweet.read`, `tweet.write` ve `offline.access` izinlerini ister; API erişim planı, hesap ve gönderi yazma hakları X tarafından belirlenir. Giriş ve profil testi başarılı olsa bile gönderi izni garanti edilmez.
+
+### LinkedIn
+
+1. LinkedIn Developer Portal'da uygulama oluşturun ve **Sign In with LinkedIn using OpenID Connect** ürününü etkinleştirin.
+2. Eklentide LinkedIn'i seçin ve gösterilen **OAuth Redirect URI** adresini uygulamanızdaki Authorized redirect URLs listesine aynen ekleyin.
+3. LinkedIn'in verdiği **Client ID** ve **Client Secret** değerlerini eklentiye girip kaydedin.
+4. **LinkedIn ile güvenli giriş** düğmesine basıp yetkilendirin. Dönüşte OpenID Connect kullanıcı profili doğrulanır.
+5. **Bağlantıyı test et** düğmesi hesabı yeniden kontrol eder. Gönderi paylaşmak için LinkedIn'in ayrı **Share on LinkedIn** ürün izni gerekebilir; bu eklenti şu anda LinkedIn'e post göndermez.
+
+### Facebook Sayfası
+
+Meta Graph API Explorer ile uygulamanız için oluşturduğunuz **Sayfa erişim belirtecini** ve Sayfa kimliğini girin. Uygulama belirtecin sahibinin Sayfa kimliğiyle eşleştiğini doğrular; bu kontrol gönderme iznini garanti etmez. Facebook bağlantısı, WordPress veritabanında OpenSSL AES-256-GCM ile şifrelenir. Anahtar WordPress güvenlik anahtarlarından türetilir; bu anahtarlar değişirse hesabı yeniden bağlayın.
+
+Facebook deneme gönderisi için **Share Now** sayfasında yayımlanmış ve şifresiz bir yazı seçin, önizlemeyi inceleyin ve yalnızca **Onayla ve Facebook’ta paylaş** düğmesine basın. Tek onay tek kullanımlıktır. Ağ hatası veya beklenmedik Meta yanıtı sonucu belirsiz bırakabilir; yeniden denemeden önce Sayfayı kontrol edin.
+
+### Bağlantıyı kaldırma ve güvenlik
+
+OAuth Client Secret ve erişim/yenileme belirteçleri veritabanında şifrelenir. Şifreleme anahtarı WordPress güvenlik anahtarlarına bağlı olduğundan `wp-config.php` anahtarlarını koruyun. Bu koruma sunucuya ve WordPress anahtarlarına erişimi olan saldırgana karşı koruma sağlamaz. Bir uygulamanın Client ID'si değişirse eski hesap bağlantısı kaldırılır ve tekrar giriş gerekir.
+
+**Hesap bağlantısını kaldır** yerel belirteçleri siler; X, LinkedIn veya Meta tarafındaki uygulama yetkisini ayrıca iptal etmeniz gerekebilir. Belirteçlerin süresi dolarsa yeniden giriş yapın.
 
 ## Planlar ve takvim
 
-Yazı kutusundaki tarih ve saat seçili tüm platformlar için ortaktır ve WordPress'in **Ayarlar → Genel** ekranındaki saat dilimindedir. Yazıyı kaydettikten sonra tarihi **Social Publisher → WP Post Schedules** listesinde ve **Calendar** takviminde görebilirsiniz. Taslak yazılar ve platform seçilmemiş planlar da gösterilir. Tarih belirtmek veya yazıyı yayımlamak, bu deneme sürümünde hiçbir yere gönderim başlatmaz.
-
-Kutuyu göremiyorsanız yazı düzenleyicisinin sağ üstündeki **Tercihler / Paneller** bölümünü kontrol edin. Menü ve şablon ayarları site yöneticileri tarafından kullanılabilir.
+Yazı kutusundaki tarih ve saat seçili tüm platformlar için ortaktır ve WordPress'in **Ayarlar → Genel** ekranındaki saat dilimindedir. Yazıyı kaydettikten sonra tarihi **WP Post Schedules** ve **Calendar** ekranlarında görebilirsiniz. Tarih belirtmek veya yazıyı yayımlamak, otomatik gönderim başlatmaz.
 
 ## Uyumluluk
 
-PHP 8.0 ve WordPress 6.2 veya üzeri hedeflenmektedir. PHP 8.5.12 ve WordPress 7.1.4 kullandığınızı belirttiniz; bu ortamda uyumluluk henüz doğrulanmadı. Lütfen önce deneme sitesinde kullanın.
+PHP 8.0 ve WordPress 6.2 veya üzeri hedeflenmektedir. PHP 8.5.12 ve WordPress 7.1.4 kullandığınızı belirttiniz; gerçek WordPress sitenizde güncellemeden önce yedek alın ve hesap bağlantılarını deneme gönderilerinden ayrı aşamalarda sınayın.

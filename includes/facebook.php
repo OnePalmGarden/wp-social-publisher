@@ -6,11 +6,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 const WSP_FACEBOOK_API_VERSION = 'v26.0';
 
-function wsp_facebook_key(): string {
+function wsp_secret_key(): string {
 	return hash( 'sha256', wp_salt( 'auth' ) . wp_salt( 'secure_auth' ), true );
 }
 
-function wsp_facebook_encrypt( string $token ) {
+function wsp_encrypt_secret( string $token ) {
 	if ( ! function_exists( 'openssl_encrypt' ) || ! function_exists( 'random_bytes' ) ) {
 		return new WP_Error( 'crypto_unavailable', 'Sunucuda OpenSSL veya güvenli rastgele sayı desteği yok.' );
 	}
@@ -20,14 +20,14 @@ function wsp_facebook_encrypt( string $token ) {
 		return new WP_Error( 'crypto_unavailable', 'Güvenli rastgele sayı üretilemedi.' );
 	}
 	$tag = '';
-	$ciphertext = openssl_encrypt( $token, 'aes-256-gcm', wsp_facebook_key(), OPENSSL_RAW_DATA, $iv, $tag );
+	$ciphertext = openssl_encrypt( $token, 'aes-256-gcm', wsp_secret_key(), OPENSSL_RAW_DATA, $iv, $tag );
 	if ( false === $ciphertext || 16 !== strlen( $tag ) ) {
 		return new WP_Error( 'crypto_failed', 'Erişim belirteci şifrelenemedi.' );
 	}
 	return base64_encode( $iv . $tag . $ciphertext );
 }
 
-function wsp_facebook_decrypt( string $encrypted ) {
+function wsp_decrypt_secret( string $encrypted ) {
 	if ( ! function_exists( 'openssl_decrypt' ) ) {
 		return new WP_Error( 'crypto_unavailable', 'Sunucuda OpenSSL desteği yok.' );
 	}
@@ -35,8 +35,20 @@ function wsp_facebook_decrypt( string $encrypted ) {
 	if ( false === $data || strlen( $data ) <= 28 ) {
 		return new WP_Error( 'crypto_failed', 'Kaydedilen belirteç okunamadı; hesabı yeniden bağlayın.' );
 	}
-	$token = openssl_decrypt( substr( $data, 28 ), 'aes-256-gcm', wsp_facebook_key(), OPENSSL_RAW_DATA, substr( $data, 0, 12 ), substr( $data, 12, 16 ) );
+	$token = openssl_decrypt( substr( $data, 28 ), 'aes-256-gcm', wsp_secret_key(), OPENSSL_RAW_DATA, substr( $data, 0, 12 ), substr( $data, 12, 16 ) );
 	return false === $token ? new WP_Error( 'crypto_failed', 'Kaydedilen belirteç çözülemedi; hesabı yeniden bağlayın.' ) : $token;
+}
+
+function wsp_facebook_key(): string {
+	return wsp_secret_key();
+}
+
+function wsp_facebook_encrypt( string $token ) {
+	return wsp_encrypt_secret( $token );
+}
+
+function wsp_facebook_decrypt( string $encrypted ) {
+	return wsp_decrypt_secret( $encrypted );
 }
 
 function wsp_facebook_request( string $path, string $token, string $method = 'GET', array $body = array() ) {
@@ -97,58 +109,7 @@ function wsp_facebook_notice(): void {
 }
 
 function wsp_accounts_page(): void {
-	$platforms = wsp_platforms();
-	$platform = isset( $_GET['platform'] ) && is_string( $_GET['platform'] ) ? sanitize_key( wp_unslash( $_GET['platform'] ) ) : 'facebook';
-	if ( ! isset( $platforms[ $platform ] ) ) {
-		$platform = 'facebook';
-	}
-	$account = get_option( 'wsp_facebook_account', array() );
-	?>
-	<div class="wrap">
-		<h1><?php esc_html_e( 'Accounts / Hesaplar', 'wp-social-publisher' ); ?></h1>
-		<?php wsp_facebook_notice(); wsp_notice(); ?>
-		<p><?php esc_html_e( 'Bir platform seçerek hesap bağlantısı ayrıntılarını görüntüleyin.', 'wp-social-publisher' ); ?></p>
-		<div class="wsp-accounts-grid">
-			<nav class="wsp-template-platforms" aria-label="<?php esc_attr_e( 'Hesap platformları', 'wp-social-publisher' ); ?>">
-				<h2><?php esc_html_e( 'Platform', 'wp-social-publisher' ); ?></h2>
-				<?php foreach ( $platforms as $key => $label ) : ?>
-					<a class="wsp-platform-tab<?php echo $platform === $key ? ' is-active' : ''; ?>" href="<?php echo esc_url( add_query_arg( 'platform', $key, admin_url( 'admin.php?page=wsp-accounts' ) ) ); ?>" <?php echo $platform === $key ? 'aria-current="page"' : ''; ?>><?php echo esc_html( $label ); ?></a>
-				<?php endforeach; ?>
-			</nav>
-			<section class="wsp-template-fields" aria-labelledby="wsp-account-heading">
-				<?php if ( 'facebook' === $platform ) : ?>
-		<h2 id="wsp-account-heading"><?php esc_html_e( 'Facebook Sayfası', 'wp-social-publisher' ); ?></h2>
-		<?php if ( is_array( $account ) && ! empty( $account['page_id'] ) ) : ?>
-			<p><?php echo esc_html( sprintf( __( 'Kayıtlı Sayfa: %1$s (ID: %2$s)', 'wp-social-publisher' ), $account['name'], $account['page_id'] ) ); ?></p>
-			<p class="description"><?php esc_html_e( 'Sayfa kaydedildi; erişim belirtecinin ve paylaşım yetkisinin güncel durumu burada kontrol edilmez.', 'wp-social-publisher' ); ?></p>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<input type="hidden" name="action" value="wsp_facebook_disconnect">
-				<?php wp_nonce_field( 'wsp_facebook_disconnect' ); ?>
-				<?php submit_button( __( 'Bağlantıyı kaldır', 'wp-social-publisher' ), 'secondary' ); ?>
-			</form>
-		<?php endif; ?>
-		<p><?php esc_html_e( 'Meta Graph API Explorer ile uygulamanız için oluşturduğunuz Sayfa erişim belirtecini ve Sayfa kimliğini girin. Kişisel Facebook şifrenizi girmeyin. Bu bilgiler için HTTPS kullanın.', 'wp-social-publisher' ); ?></p>
-		<p><?php esc_html_e( 'Belirteç WordPress veritabanında şifrelenir; WordPress güvenlik anahtarlarıyla birlikte ele geçirilirse çözülebilir. Yönetici ve sunucu erişimini koruyun. Anahtarlar değişirse hesabı yeniden bağlayın.', 'wp-social-publisher' ); ?></p>
-		<?php if ( ! is_ssl() ) : ?>
-			<div class="notice notice-error inline"><p><?php esc_html_e( 'HTTPS gereklidir; bağlantı formu güvenli olmayan bağlantılarda kullanılamaz.', 'wp-social-publisher' ); ?></p></div>
-		<?php else : ?>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" autocomplete="off">
-				<input type="hidden" name="action" value="wsp_facebook_connect">
-				<?php wp_nonce_field( 'wsp_facebook_connect' ); ?>
-				<p><label for="wsp-page-id"><?php esc_html_e( 'Facebook Sayfa kimliği', 'wp-social-publisher' ); ?></label><br><input id="wsp-page-id" name="page_id" inputmode="numeric" pattern="[0-9]+" required></p>
-				<p><label for="wsp-page-token"><?php esc_html_e( 'Sayfa erişim belirteci', 'wp-social-publisher' ); ?></label><br><input id="wsp-page-token" name="page_token" type="password" class="regular-text" autocomplete="new-password" required></p>
-				<?php submit_button( __( 'Sayfayı doğrula ve bağla', 'wp-social-publisher' ) ); ?>
-			</form>
-		<?php endif; ?>
-				<?php else : ?>
-					<h2 id="wsp-account-heading"><?php echo esc_html( $platforms[ $platform ] ); ?></h2>
-					<p><strong><?php esc_html_e( 'Bağlantı henüz kullanılamıyor', 'wp-social-publisher' ); ?></strong></p>
-					<p><?php esc_html_e( 'Bu platform için hesap doğrulama, kaydetme ve gönderim özellikleri henüz geliştirilmedi. Şimdilik herhangi bir hesap bilgisi girilmez veya kaydedilmez.', 'wp-social-publisher' ); ?></p>
-				<?php endif; ?>
-			</section>
-		</div>
-	</div>
-	<?php
+	wsp_render_accounts_page();
 }
 
 function wsp_facebook_connect(): void {

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Social Publisher
  * Description: Yazılar için platform bazlı sosyal paylaşım metinleri ve planlama taslağı.
- * Version: 0.4.1
+ * Version: 0.5.0
  * Requires at least: 6.2
  * Requires PHP: 8.0
  * Author: OnePalmGarden
@@ -16,6 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 require_once __DIR__ . '/includes/admin.php';
 require_once __DIR__ . '/includes/facebook.php';
+require_once __DIR__ . '/includes/oauth-accounts.php';
 
 function wsp_platforms(): array {
 	return array(
