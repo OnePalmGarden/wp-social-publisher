@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Social Publisher
  * Description: Yazılar için platform bazlı sosyal paylaşım metinleri ve planlama taslağı.
- * Version: 0.6.0
+ * Version: 0.7.0
  * Requires at least: 6.2
  * Requires PHP: 8.0
  * Author: OnePalmGarden

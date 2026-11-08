@@ -4,9 +4,9 @@ WordPress yazıları için Twitter / X, LinkedIn, Facebook, Medium ve Substack p
 
 ## Bu sürümde
 
-Sürüm 0.6.0; X ve LinkedIn kullanıcı hesapları için resmi OAuth 2.0 giriş ve profil doğrulaması sunar, Facebook Sayfası bağlantısı önceki Sayfa erişim belirteci formuyla sürer. **Share Now**, Facebook ve LinkedIn'e tekil gönderi için önce önizleme sonra ayrı bir kullanıcı onayı ister. LinkedIn gönderileri, onaydan sonra Posts API'ye `w_member_social` yetkisiyle gönderilir. Hesap bağlantısı, uygulamanın LinkedIn'de **Share on LinkedIn** ürün iznini veya gönderi yetkisini garanti etmez. Eklenti yazı yayımlanınca otomatik paylaşım yapmaz; planlanan tarihler yalnızca WordPress'te saklanır ve takvimde listelenir.
+Sürüm 0.7.0; X ve LinkedIn kullanıcı hesapları için resmi OAuth 2.0 giriş ve profil doğrulaması sunar, Facebook Sayfası bağlantısı önceki Sayfa erişim belirteci formuyla sürer. **Share Now**, Facebook ve LinkedIn'e tekil gönderi için görsel önizleme ve ayrı kullanıcı onayı ister. Önizlemede gösterilen öne çıkan görsel LinkedIn'e yüklenmez. **WP Auto Post** bir yazı, platform ve tarih seçerek planı takvime kaydeder; gönderimi otomatik yapmaz. Gerçek otomatik yayın için gönderim kuyruğu/çalıştırıcısı henüz yoktur. LinkedIn gönderileri, Share Now onayından sonra Posts API'ye `w_member_social` yetkisiyle gönderilir; hesap bağlantısı LinkedIn'deki **Share on LinkedIn** ürün iznini garanti etmez.
 
-**Logs** en son 200 Share Now gönderim girişimini platform, yazı, sonuç ve platform gönderi kimliğiyle listeler. Paylaşım metni ve erişim belirteçleri kayıtlara yazılmaz. Ağ hatalarında platform gönderimi almış olabilir; tekrar denemeden önce hedef hesabı kontrol edin.
+**Calendar** planları ve Share Now gönderim sonuçlarını gerçekleştiği tarihte, platform ve durum etiketiyle gösterir. **Logs** en son 200 Share Now gönderim girişimini platform, yazı, sonuç ve platform gönderi kimliğiyle listeler; platform, durum ve site saat dilimindeki gün ile filtrelenebilir. Paylaşım metni ve erişim belirteçleri kayıtlara yazılmaz. Ağ hatalarında platform gönderimi almış olabilir; tekrar denemeden önce hedef hesabı kontrol edin.
 
 Medium ve Substack için şu an desteklenen resmi OAuth bağlantısı bulunmadığından eklenti parola istemez veya tarayıcı otomasyonu kullanmaz. İleride platformların desteklediği resmi bir yayınlama yöntemi sunulursa bu alan güncellenebilir.
 
@@ -81,7 +81,7 @@ OAuth Client Secret ve erişim/yenileme belirteçleri veritabanında şifrelenir
 
 ## Planlar ve takvim
 
-Yazı kutusundaki tarih ve saat seçili tüm platformlar için ortaktır ve WordPress'in **Ayarlar → Genel** ekranındaki saat dilimindedir. Yazıyı kaydettikten sonra tarihi **WP Post Schedules** ve **Calendar** ekranlarında görebilirsiniz. Tarih belirtmek veya yazıyı yayımlamak, otomatik gönderim başlatmaz.
+**WP Auto Post** sayfasında yazıyı, bir veya daha fazla platformu ve tarih/saat bilgisini seçerek plan oluşturabilirsiniz. Bu saat WordPress'in **Ayarlar → Genel** ekranındaki saat dilimindedir. Planlar **WP Post Schedules** ve **Calendar** ekranlarında listelenir; Calendar ayrıca gönderim sonuçlarını gerçek gönderim gününde gösterir. Plan kaydetmek veya WordPress yazısını yayımlamak, otomatik gönderim başlatmaz; zamanlanmış gönderi kuyruğu/çalıştırıcısı henüz bulunmuyor.
 
 ## Uyumluluk
 

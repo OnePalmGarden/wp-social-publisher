@@ -124,6 +124,287 @@
 	font: inherit;
 }
 
+.wsp-admin-page {
+	max-width: 1440px;
+}
+
+.wsp-admin-page h1 {
+	margin-bottom: 12px;
+}
+
+.wsp-share-layout,
+.wsp-scheduler-layout,
+.wsp-confirm-layout {
+	display: grid;
+	grid-template-columns: minmax(320px, 1fr) minmax(280px, 0.8fr);
+	gap: 20px;
+	align-items: start;
+	max-width: 1100px;
+	margin-top: 24px;
+}
+
+.wsp-panel {
+	box-sizing: border-box;
+	min-width: 0;
+	padding: 22px;
+	border: 1px solid #dcdcde;
+	border-radius: 10px;
+	background: #fff;
+	box-shadow: 0 2px 8px rgb(0 0 0 / 4%);
+}
+
+.wsp-panel h2 {
+	margin-top: 0;
+}
+
+.wsp-field-label {
+	display: block;
+	margin: 18px 0 7px;
+	font-weight: 600;
+}
+
+.wsp-field-control {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: none;
+	min-height: 42px;
+	border-radius: 5px;
+}
+
+.wsp-platform-picker {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	gap: 9px;
+	margin: 22px 0;
+	padding: 14px;
+	border: 1px solid #dcdcde;
+	border-radius: 7px;
+}
+
+.wsp-platform-picker legend {
+	padding: 0 6px;
+	font-weight: 600;
+}
+
+.wsp-platform-choice {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 9px;
+	border: 1px solid #dcdcde;
+	border-radius: 5px;
+	background: #f6f7f7;
+	cursor: pointer;
+}
+
+.wsp-platform-choice:has(input:checked) {
+	border-color: #2271b1;
+	background: #f0f6fc;
+	color: #135e96;
+}
+
+.wsp-calendar-actions {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+
+.wsp-calendar-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 9px;
+	margin: 14px 0;
+}
+
+.wsp-calendar-legend span {
+	padding: 5px 9px;
+	border-left: 3px solid #2271b1;
+	border-radius: 3px;
+	background: #f0f6fc;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.wsp-calendar-legend .wsp-event-success {
+	border-left-color: #00a32a;
+	background: #edfaef;
+}
+
+.wsp-calendar-legend .wsp-event-failed {
+	border-left-color: #d63638;
+	background: #fcf0f1;
+}
+
+.wsp-calendar-legend .wsp-event-uncertain {
+	border-left-color: #dba617;
+	background: #fcf9e8;
+}
+
+.wsp-calendar-day {
+	height: 130px;
+	padding: 7px !important;
+	vertical-align: top;
+	overflow-wrap: anywhere;
+}
+
+.wsp-calendar-plan-link {
+	display: block;
+	margin: 2px 0 5px;
+	font-size: 11px;
+	text-decoration: none;
+}
+
+.wsp-calendar-event {
+	display: grid;
+	gap: 3px;
+	margin-top: 7px;
+	padding: 6px 7px;
+	border-left: 3px solid #2271b1;
+	border-radius: 3px;
+	background: #f0f6fc;
+	font-size: 12px;
+	line-height: 1.35;
+}
+
+.wsp-event-success {
+	border-left-color: #00a32a;
+	background: #edfaef;
+}
+
+.wsp-event-overdue,
+.wsp-event-failed,
+.wsp-event-incomplete {
+	border-left-color: #d63638;
+	background: #fcf0f1;
+}
+
+.wsp-event-uncertain {
+	border-left-color: #dba617;
+	background: #fcf9e8;
+}
+
+.wsp-event-working {
+	border-left-color: #72aee6;
+	background: #f0f6fc;
+}
+
+.wsp-event-time {
+	color: #50575e;
+	font-variant-numeric: tabular-nums;
+}
+
+.wsp-event-status {
+	font-weight: 700;
+}
+
+.wsp-event-platform {
+	color: #50575e;
+}
+
+.wsp-event-title {
+	display: block;
+	overflow: hidden;
+	font-weight: 600;
+	text-overflow: ellipsis;
+}
+
+.wsp-filter-bar {
+	display: flex;
+	align-items: end;
+	flex-wrap: wrap;
+	gap: 12px;
+	margin: 20px 0;
+	padding: 14px;
+	border: 1px solid #dcdcde;
+	border-radius: 7px;
+	background: #fff;
+}
+
+.wsp-filter-bar label {
+	display: grid;
+	gap: 5px;
+	font-weight: 600;
+}
+
+.wsp-social-card {
+	overflow: hidden;
+	max-width: 640px;
+	border: 1px solid #dcdcde;
+	border-radius: 10px;
+	background: #fff;
+	box-shadow: 0 4px 14px rgb(0 0 0 / 8%);
+}
+
+.wsp-social-card-header {
+	display: flex;
+	align-items: center;
+	gap: 11px;
+	padding: 16px;
+}
+
+.wsp-social-avatar {
+	display: grid;
+	width: 42px;
+	height: 42px;
+	place-items: center;
+	border-radius: 50%;
+	background: #e7f0fa;
+	color: #135e96;
+	font-weight: 700;
+}
+
+.wsp-social-card-header small,
+.wsp-social-link-card span,
+.wsp-social-link-card a {
+	display: block;
+	margin-top: 3px;
+	color: #646970;
+	font-size: 12px;
+}
+
+.wsp-social-card-copy {
+	padding: 0 16px 16px;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+	line-height: 1.55;
+}
+
+.wsp-social-card-image {
+	display: block;
+	width: 100%;
+	max-height: 360px;
+	object-fit: cover;
+	background: #f0f0f1;
+}
+
+.wsp-social-link-card {
+	display: grid;
+	gap: 4px;
+	padding: 13px 16px;
+	border-top: 1px solid #dcdcde;
+	background: #f6f7f7;
+	overflow-wrap: anywhere;
+}
+
+.wsp-social-link-card a {
+	margin-top: 0;
+}
+
+.wsp-confirm-actions .submit {
+	float: none;
+}
+
+.wsp-confirm-actions .button-large {
+	width: 100%;
+	min-height: 42px;
+	justify-content: center;
+}
+
+.wsp-confirm-actions .button-secondary {
+	margin-top: 8px;
+}
+
 @media screen and (max-width: 1100px) {
 	.wsp-template-grid {
 		grid-template-columns: minmax(130px, 0.7fr) minmax(280px, 1.3fr);
@@ -136,7 +417,10 @@
 
 @media screen and (max-width: 782px) {
 	.wsp-template-grid,
-	.wsp-accounts-grid {
+	.wsp-accounts-grid,
+	.wsp-share-layout,
+	.wsp-scheduler-layout,
+	.wsp-confirm-layout {
 		grid-template-columns: 1fr;
 	}
 
@@ -151,5 +435,14 @@
 
 	.wsp-template-platforms h2 {
 		grid-column: 1 / -1;
+	}
+
+	.wsp-calendar-day {
+		height: 110px;
+		padding: 5px !important;
+	}
+
+	.wsp-calendar-event {
+		padding: 5px;
 	}
 }

@@ -72,7 +72,9 @@ function sanitize_text_field( $value ) { return trim( strip_tags( $value ) ); }
 function sanitize_textarea_field( $value ) { return trim( strip_tags( $value ) ); }
 function sanitize_key( $value ) { return strtolower( preg_replace( '/[^a-z0-9_\-]/', '', $value ) ); }
 function wp_timezone() { return new DateTimeZone( 'Europe/Istanbul' ); }
+function wp_timezone_string() { return 'Europe/Istanbul'; }
 function get_the_title( $post ) { return 'Deneme başlığı'; }
+function get_the_post_thumbnail_url( $post, $size ) { return 'https://example.test/featured.jpg'; }
 function get_the_excerpt( $post ) { return '<p>Özet metni</p>'; }
 function wp_strip_all_tags( $value ) { return strip_tags( $value ); }
 function get_permalink( $post ) { return 'https://example.test/deneme/'; }
@@ -90,6 +92,7 @@ function wp_nonce_field( ...$args ) {}
 function checked( $value ) { if ( $value ) { echo 'checked'; } }
 function wp_date( $format, $time, $timezone ) { return ( new DateTimeImmutable( '@' . $time ) )->setTimezone( $timezone )->format( $format ); }
 function admin_url( $path ) { return 'https://example.test/wp-admin/' . $path; }
+function wp_parse_url( $url, $component = -1 ) { return parse_url( $url, $component ); }
 function add_query_arg( $key, $value = null, $url = null ) {
 	if ( is_array( $key ) ) {
 		$url = $value;
@@ -104,6 +107,11 @@ function add_query_arg( $key, $value = null, $url = null ) {
 }
 function get_edit_post_link( $id ) { return admin_url( 'post.php?post=' . $id ); }
 function get_post_status_object( $status ) { return (object) array( 'label' => $status ); }
+function selected( $selected, $current = true, $echo = true ) {
+	$result = (string) $selected === (string) $current ? ' selected="selected"' : '';
+	if ( $echo ) { echo $result; }
+	return $result;
+}
 function paginate_links( $args ) { return ''; }
 function wp_kses_post( $value ) { return $value; }
 function absint( $value ) { return abs( (int) $value ); }
@@ -210,12 +218,23 @@ $GLOBALS['test_post'] = $post;
 $GLOBALS['nonce_valid'] = true;
 $GLOBALS['response'] = array( 'code' => 200, 'body' => '{"id":"123_456"}' );
 $_POST = array( 'platform' => 'facebook', 'post_id' => '12' );
-ob_start();
-wsp_facebook_preview();
-$confirmation = ob_get_clean();
-expect( str_contains( $confirmation, 'Eski özel metin' ) && str_contains( $confirmation, 'Onayla ve Facebook' ), 'Paylaşım öncesi doğru mesaj ve onay gösterilmeli' );
+try {
+	wsp_facebook_preview();
+} catch ( RuntimeException $error ) {
+	expect( str_contains( $error->getMessage(), 'preview=' ), 'Önizleme yönetim sayfasına yönlendirmeli' );
+}
 $draft_id = str_repeat( 'a', 32 );
 expect( isset( $GLOBALS['transients']['wsp_fb_draft_' . $draft_id] ), 'Onay için sunucuda taslak saklanmalı' );
+$_GET = array( 'preview' => $draft_id );
+ob_start();
+wsp_share_now_page();
+$confirmation = ob_get_clean();
+expect( str_contains( $confirmation, 'Eski özel metin' ) && str_contains( $confirmation, 'Onayla ve Facebook' ) && str_contains( $confirmation, 'wsp-social-card' ), 'Önizleme WordPress yönetim sayfasında görsel kart olarak gösterilmeli' );
+$_GET['page'] = 'wsp-share-now';
+$GLOBALS['enqueued'] = array();
+wsp_admin_assets( 'unused-hook-name' );
+expect( 1 === count( $GLOBALS['enqueued'] ) && str_contains( $GLOBALS['enqueued'][0], 'templates.css' ), 'Share Now önizlemesi yönetim paneli stilini yüklemeli' );
+$GLOBALS['enqueued'] = array();
 $_POST = array( 'draft' => $draft_id, 'platform' => 'facebook' );
 $GLOBALS['nonce_valid'] = false;
 try {
@@ -385,13 +404,19 @@ expect( 'li-123' === get_option( 'wsp_oauth_accounts' )['linkedin']['profile']['
 $GLOBALS['password_override'] = str_repeat( 'b', 32 );
 $_POST = array( 'platform' => 'linkedin', 'post_id' => '12' );
 $GLOBALS['response'] = array( 'code' => 201, 'body' => '', 'headers' => array( 'x-restli-id' => 'urn:li:share:789' ) );
+try {
+	wsp_facebook_preview();
+} catch ( RuntimeException $error ) {}
+$GLOBALS['password_override'] = str_repeat( 'b', 32 );
+$_GET = array( 'preview' => str_repeat( 'b', 32 ) );
 ob_start();
-wsp_facebook_preview();
+wsp_share_now_page();
 $linkedin_confirmation = ob_get_clean();
 expect( str_contains( $linkedin_confirmation, 'LinkedIn: Deneme başlığı' ) && str_contains( $linkedin_confirmation, 'Onayla ve LinkedIn' ), 'LinkedIn önizlemesi onay adımını göstermeli' );
 $linkedin_draft_id = str_repeat( 'b', 32 );
 $linkedin_draft = get_transient( 'wsp_fb_draft_' . $linkedin_draft_id );
 expect( is_array( $linkedin_draft ) && str_contains( $linkedin_draft['message'], 'https://example.test/deneme/' ), 'LinkedIn gönderi metnine yazı bağlantısı eklenmeli' );
+expect( 'https://example.test/featured.jpg' === $linkedin_draft['image_url'] && str_contains( $linkedin_confirmation, 'wsp-social-card' ) && str_contains( $linkedin_confirmation, 'featured.jpg' ), 'LinkedIn onay ekranı metin, görsel ve yazı kartıyla görsel önizleme sunmalı' );
 $_POST = array( 'draft' => $linkedin_draft_id, 'platform' => 'linkedin' );
 try {
 	wsp_facebook_publish();
@@ -404,15 +429,32 @@ $linkedin_payload = json_decode( $GLOBALS['request'][1]['body'], true );
 expect( 'urn:li:person:li-123' === $linkedin_payload['author'] && 'PUBLISHED' === $linkedin_payload['lifecycleState'], 'LinkedIn API yükü doğru yazarla yayınlanmalı' );
 expect( 'Başarılı' === get_option( 'wsp_delivery_logs' )[0]['status'] && 'urn:li:share:789' === get_option( 'wsp_delivery_logs' )[0]['remote_id'], 'Başarılı LinkedIn gönderimi Logs kaydına yazılmalı' );
 expect( ! str_contains( json_encode( get_option( 'wsp_delivery_logs' ) ), 'li-access' ), 'Logs kayıtları erişim belirteci içermemeli' );
+$_GET = array(
+	'page'     => 'wsp-logs',
+	'platform' => 'linkedin',
+	'status'   => 'Başarılı',
+	'day'      => wp_date( 'Y-m-d', strtotime( get_option( 'wsp_delivery_logs' )[0]['created_at'] . ' UTC' ), wp_timezone() ),
+);
 ob_start();
 wsp_logs_page();
 $logs_page = ob_get_clean();
-expect( str_contains( $logs_page, 'urn:li:share:789' ) && str_contains( $logs_page, 'Deneme başlığı' ), 'Logs ekranı LinkedIn gönderi sonucunu göstermeli' );
+expect( str_contains( $logs_page, 'urn:li:share:789' ) && str_contains( $logs_page, 'Deneme başlığı' ) && str_contains( $logs_page, 'name="day"' ), 'Logs ekranı sonuçları platform/durum/gün filtresiyle göstermeli' );
+$_GET = array();
+$GLOBALS['posts'] = array( $post );
+ob_start();
+wsp_auto_post_page();
+$auto_post_page = ob_get_clean();
+expect( str_contains( $auto_post_page, 'name="platforms[]"' ) && str_contains( $auto_post_page, 'datetime-local' ) && str_contains( $auto_post_page, 'Takvime plan olarak ekle' ), 'WP Auto Post plan oluşturma alanlarını göstermeli' );
+$_GET = array( 'day' => '2026-11-25' );
+ob_start();
+wsp_auto_post_page();
+$preselected_auto_post_page = ob_get_clean();
+expect( str_contains( $preselected_auto_post_page, 'value="2026-11-25T09:00"' ), 'Takvimden seçilen gün otomatik plan formuna taşınmalı' );
 $GLOBALS['password_override'] = str_repeat( 'c', 32 );
 $_POST = array( 'platform' => 'linkedin', 'post_id' => '12' );
-ob_start();
-wsp_facebook_preview();
-ob_end_clean();
+try {
+	wsp_facebook_preview();
+} catch ( RuntimeException $error ) {}
 $_POST = array( 'draft' => str_repeat( 'c', 32 ), 'platform' => 'linkedin' );
 $GLOBALS['response'] = array( 'code' => 403, 'body' => '{"message":"li-access"}' );
 try {
@@ -444,16 +486,28 @@ expect( ! isset( get_option( 'wsp_oauth_accounts' )['linkedin'] ), 'LinkedIn tok
 expect( 'linkedin-client' === wsp_oauth_apps()['linkedin']['client_id'], 'Bağlantıyı kaldırmak geliştirici uygulamasını silmemeli' );
 
 $GLOBALS['posts'] = array( $post );
+$GLOBALS['options']['wsp_delivery_logs'] = array(
+	array( 'id' => 'cal-1', 'created_at' => '2026-11-18 07:15:00', 'platform' => 'linkedin', 'platform_name' => 'LinkedIn', 'post_id' => 12, 'post_title' => 'Deneme başlığı', 'status' => 'Başarılı', 'message' => 'Gönderildi.', 'remote_id' => 'li-cal' ),
+	array( 'id' => 'cal-2', 'created_at' => '2026-11-19 08:15:00', 'platform' => 'facebook', 'platform_name' => 'Facebook', 'post_id' => 12, 'post_title' => 'Deneme başlığı', 'status' => 'Başarısız', 'message' => 'İzin yok.', 'remote_id' => '' ),
+);
 $_GET = array( 'month' => '2026-11' );
 ob_start();
 wsp_calendar_page();
 $calendar = ob_get_clean();
-expect( str_contains( $calendar, '09:30' ) && str_contains( $calendar, 'LinkedIn, Facebook' ), 'Takvim planı göstermeli' );
+expect( str_contains( $calendar, '09:30' ) && str_contains( $calendar, 'LinkedIn' ) && str_contains( $calendar, 'Facebook' ) && str_contains( $calendar, 'Başarılı' ) && str_contains( $calendar, 'Başarısız' ), 'Takvim planlanan ve gerçekleşen platform/durum kayıtlarını göstermeli' );
+expect( str_contains( $calendar, 'Bu güne planla' ) && str_contains( $calendar, 'wsp-event-success' ), 'Takvim plan oluşturma bağlantısı ve durum göstergesi sunmalı' );
 expect( '2026-11-01T00:00' === $GLOBALS['last_query']['meta_query'][0][0]['value'], 'Takvim ay başından sorgulamalı' );
 expect( '2026-12-01T00:00' === $GLOBALS['last_query']['meta_query'][0][1]['value'], 'Takvim sonraki ayı dışlamalı' );
 ob_start();
 wsp_schedules_page();
 $schedule = ob_get_clean();
 expect( str_contains( $schedule, '2026-11-18 09:30' ) && str_contains( $schedule, 'Deneme başlığı' ), 'Plan listesi tarih ve yazıyı göstermeli' );
+$_POST = array( 'post_id' => '12', 'platforms' => array( 'linkedin', 'facebook' ), 'scheduled_at' => '2026-11-20T14:45' );
+try {
+	wsp_save_auto_post();
+} catch ( RuntimeException $error ) {
+	expect( str_starts_with( $error->getMessage(), 'redirect:' ), 'Başarılı plan kaydı otomatik plan sayfasına yönlendirmeli' );
+}
+expect( '2026-11-20T14:45' === get_post_meta( 12, '_wsp_scheduled_at', true ) && '1' === get_post_meta( 12, '_wsp_linkedin_enabled', true ) && '1' === get_post_meta( 12, '_wsp_facebook_enabled', true ), 'WP Auto Post seçilen yazı/platform/tarihi WordPress meta alanlarına kaydetmeli' );
 
 echo "Smoke checks passed.\n";
