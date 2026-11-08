@@ -164,6 +164,21 @@
 	margin-top: 0;
 }
 
+.wsp-scheduler-sidebar {
+	display: grid;
+	gap: 20px;
+	min-width: 0;
+}
+
+.wsp-share-filter {
+	box-sizing: border-box;
+	max-width: 1100px;
+}
+
+.wsp-schedules-filter {
+	margin: 24px 0;
+}
+
 .wsp-field-label {
 	display: block;
 	margin: 18px 0 7px;

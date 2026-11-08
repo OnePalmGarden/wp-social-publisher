@@ -4,7 +4,7 @@ WordPress yazıları için Twitter / X, LinkedIn, Facebook, Instagram, Reddit ve
 
 ## Bu sürümde
 
-Sürüm 0.9.0; X, LinkedIn, Instagram, Reddit ve Pinterest için OAuth 2.0 hesap bağlantısı; Facebook Sayfası için erişim belirteci bağlantısı içerir. **Share Now** onayından sonra tüm bağlı platformlar için gönderi API'leri kullanılır. X'te 140 karakterlik kişisel hedef aşılırsa gönderim engellenir; LinkedIn'de öne çıkan görsel yüklenir; Instagram ve Pinterest görsel gönderisi için HTTPS üzerinden herkese açık öne çıkan görsel gerekir; Reddit bağlantı gönderisini Accounts sayfasında seçilen subreddit'e yollar. API ürün erişimi, uygulama incelemesi ve hesap izinleri platform sağlayıcısının kontrolündedir.
+Sürüm 0.9.1; X, LinkedIn, Instagram, Reddit ve Pinterest için OAuth 2.0 hesap bağlantısı; Facebook Sayfası için erişim belirteci bağlantısı içerir. **Share Now** onayından sonra tüm bağlı platformlar için gönderi API'leri kullanılır. X'te 140 karakterlik kişisel hedef aşılırsa gönderim engellenir; LinkedIn'de öne çıkan görsel yüklenir; Instagram ve Pinterest görsel gönderisi için HTTPS üzerinden herkese açık öne çıkan görsel gerekir; Reddit bağlantı gönderisini Accounts sayfasında seçilen subreddit'e yollar. API ürün erişimi, uygulama incelemesi ve hesap izinleri platform sağlayıcısının kontrolündedir.
 
 **WP Auto Post** ve yazı düzenleyicisindeki tarih alanı seçilen bağlı hesaplar için WordPress tek seferlik cron görevleri oluşturur ve zamanı gelince canlı yayın dener. Gönderim sonuçları **Logs**, durumları **WP Post Schedules** ve **Calendar** ekranlarında gösterilir. WP-Cron ziyaret trafiğiyle çalıştığından düşük trafikli sitelerde gönderi tam dakikasında çalışmayabilir; dakiklik için hosting sağlayıcınızın zamanlanmış cron özelliğiyle `wp-cron.php` dosyasını düzenli çalıştırın. Kuyruk aynı planı yinelenen cron tetiklemelerine karşı korur; başarısız/belirsiz gönderiyi otomatik tekrar denemez.
 
@@ -31,7 +31,10 @@ Güncellemeden önce sitenizin yedeğini alın. Mevcut yazıların platform seç
 | `{excerpt}` | Özet; WordPress'in varsayılan özet davranışı kullanılır |
 | `{url}` | Yazı bağlantısı |
 | `{tags}` | Yazı etiketleri; virgülle ayrılır, otomatik `#` eklenmez |
+| `{hashtags}` | Yazı etiketleri `#WordPress #Sosyalmedya` biçiminde, boşlukla ayrılmış olarak eklenir |
 | `{site_title}` | WordPress site adı |
+
+Hashtag kullanmak için ilgili platformun **Etiketler** alanındaki `{tags}` yerine `{hashtags}` yazın ve şablonu kaydedin. Yazıya özel metinde de kullanılabilir. Boşluklar ve noktalama işaretleri kaldırılır, harfler (Türkçe karakterler dahil), rakamlar ve alt çizgiler korunur; platformlar hashtagleri farklı değerlendirebilir. Mevcut şablonlar otomatik değiştirilmez.
 
 İçerik, URL ve etiket alanlarının boş olmayanları paylaşım metninde sırasıyla aralarında boş satır olacak şekilde birleştirilir. Şablon ekranı, öne çıkan görseli bulunan en son yayımlanmış yazının görselini örnek kartta gösterir; öne çıkan görsel yoksa görsel alanının boş olduğu belirtilir.
 

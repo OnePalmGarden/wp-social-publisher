@@ -11,7 +11,7 @@ const counter = { textContent: '', style: {} };
 const box = {
 	dataset: {
 		template: '{title}\n{url}\n{tags}',
-		values: JSON.stringify({ '{title}': 'Başlık', '{url}': 'https://example.test/yazi', '{tags}': 'etiket' })
+		values: JSON.stringify({ '{title}': 'Başlık', '{url}': 'https://example.test/yazi', '{tags}': 'etiket', '{hashtags}': '#etiket #sosyalmedya' })
 	},
 	querySelector(selector) {
 		return { textarea: input, '.wsp-post-preview-text': preview, '.wsp-x-count': counter }[selector];
@@ -21,6 +21,10 @@ const document = { readyState: 'complete', querySelector: () => box };
 vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../assets/post-preview.js'), 'utf8'), { document, Array, JSON });
 assert.strictEqual(preview.textContent, 'Başlık\nhttps://example.test/yazi\netiket');
 assert.strictEqual(counter.textContent, 'Tahmini karakter sayısı: 39 / 140');
+input.value = '{hashtags}';
+input.callback();
+assert.strictEqual(preview.textContent, '#etiket #sosyalmedya');
+assert.strictEqual(counter.textContent, 'Tahmini karakter sayısı: 20 / 140');
 input.value = '😀'.repeat(140);
 input.callback();
 assert.strictEqual(counter.textContent, 'Tahmini karakter sayısı: 140 / 140');

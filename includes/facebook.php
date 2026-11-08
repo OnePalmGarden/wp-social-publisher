@@ -308,7 +308,7 @@ function wsp_share_now_page(): void {
 		<?php elseif ( ! $query->posts ) : ?>
 			<p><?php esc_html_e( 'Paylaşılabilecek yayımlanmış ve şifresiz yazı bulunamadı.', 'wp-social-publisher' ); ?></p>
 		<?php else : ?>
-			<form method="get" class="wsp-filter-bar">
+			<form method="get" class="wsp-filter-bar wsp-share-filter">
 				<input type="hidden" name="page" value="wsp-share-now">
 				<label><?php esc_html_e( 'Yazı kategorisi', 'wp-social-publisher' ); ?>
 					<select name="cat"><option value="0"><?php esc_html_e( 'Tüm kategoriler', 'wp-social-publisher' ); ?></option>

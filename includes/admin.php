@@ -21,13 +21,13 @@ function wsp_admin_assets( string $hook_suffix ): void {
 		return;
 	}
 	$page = sanitize_key( wp_unslash( $_GET['page'] ) );
-	if ( ! in_array( $page, array( 'wsp-templates', 'wsp-accounts', 'wsp-auto-post', 'wsp-share-now', 'wsp-calendar', 'wsp-logs' ), true ) ) {
+	if ( ! in_array( $page, array( 'wsp-templates', 'wsp-accounts', 'wsp-auto-post', 'wsp-schedules', 'wsp-share-now', 'wsp-calendar', 'wsp-logs' ), true ) ) {
 		return;
 	}
 	$base_url = plugin_dir_url( dirname( __DIR__ ) . '/wp-social-publisher.php' );
-	wp_enqueue_style( 'wsp-templates', $base_url . 'assets/templates.css', array(), '0.9.0' );
+	wp_enqueue_style( 'wsp-templates', $base_url . 'assets/templates.css', array(), '0.9.1' );
 	if ( 'wsp-templates' === $page ) {
-		wp_enqueue_script( 'wsp-templates', $base_url . 'assets/templates.js', array(), '0.3.0', true );
+		wp_enqueue_script( 'wsp-templates', $base_url . 'assets/templates.js', array(), '0.9.1', true );
 	}
 }
 add_action( 'admin_enqueue_scripts', 'wsp_admin_assets' );
@@ -201,12 +201,13 @@ function wsp_templates_page(): void {
 							</p>
 							<p><label for="wsp-tags-<?php echo esc_attr( $key ); ?>"><?php esc_html_e( 'Etiketler', 'wp-social-publisher' ); ?></label>
 								<input id="wsp-tags-<?php echo esc_attr( $key ); ?>" type="text" name="templates[<?php echo esc_attr( $key ); ?>][tags]" value="<?php echo esc_attr( $fields['tags'] ); ?>" class="large-text wsp-template-input" data-field="tags">
+								<span class="description"><?php esc_html_e( '{tags} düz etiketleri, {hashtags} ise # işaretli etiketleri ekler.', 'wp-social-publisher' ); ?></span>
 							</p>
 							<details class="wsp-smart-tags">
 								<summary><?php esc_html_e( 'Akıllı etiketleri göster', 'wp-social-publisher' ); ?></summary>
 								<p><?php esc_html_e( 'Etiketi eklemek istediğiniz alana tıklayın; ekleme imlecin olduğu yere yapılır.', 'wp-social-publisher' ); ?></p>
 								<div class="wsp-smart-tag-buttons">
-									<?php foreach ( array( '{title}' => 'Başlık', '{excerpt}' => 'Özet', '{url}' => 'Yazı bağlantısı', '{tags}' => 'Yazı etiketleri', '{site_title}' => 'Site adı' ) as $tag => $tag_label ) : ?>
+									<?php foreach ( array( '{title}' => 'Başlık', '{excerpt}' => 'Özet', '{url}' => 'Yazı bağlantısı', '{tags}' => 'Yazı etiketleri', '{hashtags}' => 'Hashtag olarak yazı etiketleri', '{site_title}' => 'Site adı' ) as $tag => $tag_label ) : ?>
 										<button type="button" class="button button-secondary" data-smart-tag="<?php echo esc_attr( $tag ); ?>"><?php echo esc_html( $tag ); ?> <span class="screen-reader-text"><?php echo esc_html( $tag_label ); ?></span></button>
 									<?php endforeach; ?>
 								</div>
@@ -336,21 +337,25 @@ function wsp_auto_post_page(): void {
 					</form>
 				<?php endif; ?>
 			</section>
-			<section class="wsp-panel wsp-scheduler-calendar">
-				<h2><?php esc_html_e( 'Takvimi görüntüle', 'wp-social-publisher' ); ?></h2>
-				<p><?php esc_html_e( 'Kayıtlı planları ay görünümünde inceleyin; gerçek gönderim sonuçları ayrıca durum etiketiyle gösterilir.', 'wp-social-publisher' ); ?></p>
-				<a class="button button-secondary" href="<?php echo esc_url( admin_url( 'admin.php?page=wsp-calendar' ) ); ?>"><?php esc_html_e( 'Paylaşım takvimini aç', 'wp-social-publisher' ); ?></a>
-				<h3><?php esc_html_e( 'Son planlanan 10 gönderi', 'wp-social-publisher' ); ?></h3>
-				<?php if ( $recent_plans->posts ) : ?>
-					<ul>
-						<?php foreach ( array_slice( $recent_plans->posts, 0, 10 ) as $planned_post ) : ?>
-							<li><?php echo esc_html( get_post_meta( $planned_post->ID, '_wsp_scheduled_at', true ) . ' — ' . get_the_title( $planned_post ) . ' — ' . wsp_post_category_names( $planned_post->ID ) . ' — ' . wsp_schedule_state_label( (string) get_post_meta( $planned_post->ID, '_wsp_schedule_state', true ) ) ); ?></li>
-						<?php endforeach; ?>
-					</ul>
-				<?php else : ?>
-					<p><?php esc_html_e( 'Henüz planlanan gönderi yok.', 'wp-social-publisher' ); ?></p>
-				<?php endif; ?>
-			</section>
+			<div class="wsp-scheduler-sidebar">
+				<section class="wsp-panel wsp-scheduler-calendar">
+					<h2><?php esc_html_e( 'Takvimi görüntüle', 'wp-social-publisher' ); ?></h2>
+					<p><?php esc_html_e( 'Kayıtlı planları ay görünümünde inceleyin; gerçek gönderim sonuçları ayrıca durum etiketiyle gösterilir.', 'wp-social-publisher' ); ?></p>
+					<a class="button button-secondary" href="<?php echo esc_url( admin_url( 'admin.php?page=wsp-calendar' ) ); ?>"><?php esc_html_e( 'Paylaşım takvimini aç', 'wp-social-publisher' ); ?></a>
+				</section>
+				<section class="wsp-panel wsp-scheduler-recent">
+					<h2><?php esc_html_e( 'Son planlanan 10 gönderi', 'wp-social-publisher' ); ?></h2>
+					<?php if ( $recent_plans->posts ) : ?>
+						<ul>
+							<?php foreach ( array_slice( $recent_plans->posts, 0, 10 ) as $planned_post ) : ?>
+								<li><?php echo esc_html( get_post_meta( $planned_post->ID, '_wsp_scheduled_at', true ) . ' — ' . get_the_title( $planned_post ) . ' — ' . wsp_post_category_names( $planned_post->ID ) . ' — ' . wsp_schedule_state_label( (string) get_post_meta( $planned_post->ID, '_wsp_schedule_state', true ) ) ); ?></li>
+							<?php endforeach; ?>
+						</ul>
+					<?php else : ?>
+						<p><?php esc_html_e( 'Henüz planlanan gönderi yok.', 'wp-social-publisher' ); ?></p>
+					<?php endif; ?>
+				</section>
+			</div>
 		</div>
 	</div>
 	<?php
@@ -460,10 +465,10 @@ function wsp_schedules_page(): void {
 	}
 	$query = wsp_scheduled_posts( '' !== $date_from ? $date_from : null, '' !== $date_to ? $date_to : null, $page, $category );
 	?>
-	<div class="wrap">
+	<div class="wrap wsp-schedules-page">
 		<h1><?php esc_html_e( 'WP Post Schedules / Yazı planları', 'wp-social-publisher' ); ?></h1>
 		<?php wsp_notice(); ?>
-		<form method="get" class="wsp-filter-bar">
+		<form method="get" class="wsp-filter-bar wsp-schedules-filter">
 			<input type="hidden" name="page" value="wsp-schedules">
 			<label><?php esc_html_e( 'Kategori', 'wp-social-publisher' ); ?>
 				<select name="cat"><option value="0"><?php esc_html_e( 'Tüm kategoriler', 'wp-social-publisher' ); ?></option>

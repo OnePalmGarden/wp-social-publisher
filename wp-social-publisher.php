@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Social Publisher
  * Description: Yazılar için platform bazlı sosyal paylaşım metinleri ve planlama taslağı.
- * Version: 0.9.0
+ * Version: 0.9.1
  * Requires at least: 6.2
  * Requires PHP: 8.0
  * Author: OnePalmGarden
@@ -74,9 +74,14 @@ function wsp_template( string $platform ): string {
 function wsp_template_values( WP_Post $post ): array {
 	$tags = get_the_tags( $post->ID );
 	$tag_names = array();
+	$hashtags = array();
 	if ( is_array( $tags ) ) {
 		foreach ( $tags as $tag ) {
 			$tag_names[] = $tag->name;
+			$hashtag = preg_replace( '/[^\p{L}\p{M}\p{N}_]+/u', '', $tag->name );
+			if ( is_string( $hashtag ) && '' !== $hashtag ) {
+				$hashtags[] = '#' . $hashtag;
+			}
 		}
 	}
 	return array(
@@ -84,6 +89,7 @@ function wsp_template_values( WP_Post $post ): array {
 			'{excerpt}' => wp_strip_all_tags( get_the_excerpt( $post ) ),
 			'{url}'     => get_permalink( $post ),
 			'{tags}'    => implode( ', ', $tag_names ),
+			'{hashtags}' => implode( ' ', $hashtags ),
 			'{site_title}' => get_bloginfo( 'name' ),
 	);
 }
@@ -105,7 +111,7 @@ function wsp_editor_assets( string $hook_suffix ): void {
 	if ( ! $screen || 'post' !== $screen->post_type ) {
 		return;
 	}
-	wp_enqueue_script( 'wsp-post-preview', plugin_dir_url( __FILE__ ) . 'assets/post-preview.js', array(), '0.4.0', true );
+	wp_enqueue_script( 'wsp-post-preview', plugin_dir_url( __FILE__ ) . 'assets/post-preview.js', array(), '0.9.1', true );
 }
 add_action( 'admin_enqueue_scripts', 'wsp_editor_assets' );
 
@@ -131,7 +137,7 @@ function wsp_render_share_metabox( WP_Post $post ): void {
 	$platforms = wsp_platforms();
 	wp_nonce_field( 'wsp_save_share_settings', 'wsp_share_nonce' );
 	?>
-	<p><?php esc_html_e( 'Platformları seçin. Yazıya özel metni boş bırakırsanız o platformun varsayılan şablonu kullanılır. Alanlarda {title}, {excerpt}, {url} ve {tags} kullanabilirsiniz.', 'wp-social-publisher' ); ?></p>
+	<p><?php esc_html_e( 'Platformları seçin. Yazıya özel metni boş bırakırsanız o platformun varsayılan şablonu kullanılır. Alanlarda {title}, {excerpt}, {url}, {tags} ve {hashtags} kullanabilirsiniz.', 'wp-social-publisher' ); ?></p>
 	<p><?php esc_html_e( 'Önizleme en son kaydedilen yazı bilgilerine dayanır. Öne çıkan görsel gönderi metninden ayrı bir medya öğesidir; görsel desteği platform bağlantısına göre değişir.', 'wp-social-publisher' ); ?></p>
 	<div class="wsp-platform-list">
 		<?php foreach ( $platforms as $key => $label ) : ?>

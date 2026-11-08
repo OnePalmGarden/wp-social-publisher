@@ -17,7 +17,7 @@
 		}
 		function update() {
 			const template = input.value !== '' ? input.value : box.dataset.template;
-			const text = template.replace(/\{title\}|\{excerpt\}|\{url\}|\{tags\}|\{site_title\}/g, function (tag) {
+			const text = template.replace(/\{title\}|\{excerpt\}|\{url\}|\{tags\}|\{hashtags\}|\{site_title\}/g, function (tag) {
 				return values[tag];
 			});
 			const count = Array.from(text).length;

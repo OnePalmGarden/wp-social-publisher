@@ -100,7 +100,7 @@ function wp_check_filetype_and_ext( $file, $filename ) { return array( 'type' =>
 function get_the_excerpt( $post ) { return '<p>Özet metni</p>'; }
 function wp_strip_all_tags( $value ) { return strip_tags( $value ); }
 function get_permalink( $post ) { return 'https://example.test/deneme/'; }
-function get_the_tags( $id ) { return array( (object) array( 'name' => 'WordPress' ), (object) array( 'name' => 'Sosyal medya' ) ); }
+function get_the_tags( $id ) { return array_key_exists( 'test_tags', $GLOBALS ) ? $GLOBALS['test_tags'] : array( (object) array( 'name' => 'WordPress' ), (object) array( 'name' => 'Sosyal medya' ) ); }
 function get_the_category( $id ) { return array( (object) array( 'term_id' => 3, 'name' => 'Teknoloji' ) ); }
 function get_categories( $args = array() ) { return array( (object) array( 'term_id' => 3, 'name' => 'Teknoloji' ) ); }
 function get_bloginfo( $show ) { return 'Deneme sitesi'; }
@@ -169,6 +169,12 @@ expect(
 	"Deneme başlığı|Özet metni|https://example.test/deneme/|WordPress, Sosyal medya|Deneme sitesi" === wsp_render_template( '{title}|{excerpt}|{url}|{tags}|{site_title}', $post ),
 	'Yer tutucular yazı verilerine dönüşmeli'
 );
+expect( '#WordPress #Sosyalmedya' === wsp_render_template( '{hashtags}', $post ), 'Hashtag yer tutucusu her etiketi ayrı biçimlendirmeli' );
+$GLOBALS['test_tags'] = array( (object) array( 'name' => '#İstanbul 2026' ), (object) array( 'name' => 'çağrı-ş/ö_2' ), (object) array( 'name' => '!!!' ) );
+expect( '#İstanbul2026 #çağrışö_2' === wsp_render_template( '{hashtags}', $post ), 'Hashtag Türkçe harfleri ve rakamları korumalı, noktalama ve boş etiketleri çıkarmalı' );
+$GLOBALS['test_tags'] = false;
+expect( '' === wsp_render_template( '{hashtags}', $post ), 'Etiketsiz yazıda hashtag alanı boş olmalı' );
+unset( $GLOBALS['test_tags'] );
 
 $_POST = array(
 	'wsp_share_nonce' => 'valid',
@@ -292,6 +298,7 @@ ob_start();
 wsp_templates_page();
 $template_page = ob_get_clean();
 expect( str_contains( $template_page, 'Akıllı etiketleri göster' ) && str_contains( $template_page, 'data-smart-tag="{title}"' ), 'Akıllı etiketleri gösterip ekleyebilmeli' );
+expect( str_contains( $template_page, 'data-smart-tag="{hashtags}"' ), 'Hashtag yer tutucusu şablon düzenleyicisinden seçilebilmeli' );
 expect( str_contains( $template_page, 'wsp-template-grid' ) && str_contains( $template_page, 'wsp-preview-text' ), 'Üç bölümlü düzen ve önizleme bulunmalı' );
 expect( str_contains( $template_page, 'wsp-preview-image' ) && str_contains( $template_page, 'featured.jpg' ), 'Şablon önizlemesi öne çıkan görseli göstermeli' );
 
@@ -462,6 +469,7 @@ ob_start();
 wsp_share_now_page();
 $share_picker = ob_get_clean();
 expect( str_contains( $share_picker, 'name="cat"' ) && str_contains( $share_picker, 'Deneme başlığı — Teknoloji' ) && 3 === $GLOBALS['last_query']['cat'], 'Share Now yazı listesi kategorilerle süzülebilmeli' );
+expect( str_contains( $share_picker, 'wsp-filter-bar wsp-share-filter' ), 'Share Now filtresi paylaşım sütunlarıyla aynı genişlikte sınırlandırılmalı' );
 $temporary_image = tempnam( sys_get_temp_dir(), 'wsp-image-' );
 $GLOBALS['attached_file'] = $temporary_image . '.jpg';
 rename( $temporary_image, $GLOBALS['attached_file'] );
@@ -526,6 +534,7 @@ wsp_auto_post_page();
 $preselected_auto_post_page = ob_get_clean();
 expect( str_contains( $preselected_auto_post_page, 'value="2026-11-25T09:00"' ), 'Takvimden seçilen gün otomatik plan formuna taşınmalı' );
 expect( str_contains( $preselected_auto_post_page, 'Teknoloji' ) && str_contains( $preselected_auto_post_page, 'Son planlanan 10 gönderi' ), 'Autopost kategori bilgisi ve son 10 planı göstermeli' );
+expect( (bool) preg_match( '/<section class="wsp-panel wsp-scheduler-calendar">.*?<\/section>\s*<section class="wsp-panel wsp-scheduler-recent">/s', $preselected_auto_post_page ), 'Takvim bağlantısı ve son planlar ayrı panellerde olmalı' );
 $GLOBALS['password_override'] = str_repeat( 'c', 32 );
 $_POST = array( 'platform' => 'linkedin', 'post_id' => '12' );
 try {
@@ -581,6 +590,7 @@ wsp_schedules_page();
 $schedule = ob_get_clean();
 expect( str_contains( $schedule, '2026-11-18 09:30' ) && str_contains( $schedule, 'Deneme başlığı' ) && str_contains( $schedule, 'Teknoloji' ), 'Plan listesi tarih, yazı ve kategoriyi göstermeli' );
 expect( str_contains( $schedule, 'date_from' ) && str_contains( $schedule, 'date_to' ) && str_contains( $schedule, 'name="cat"' ), 'Plan listesi kategori ve tarih filtreleri sunmalı' );
+expect( str_contains( $schedule, 'wsp-filter-bar wsp-schedules-filter' ), 'Plan filtrelerine özel boşluk sınıfı eklenmeli' );
 $GLOBALS['options']['wsp_oauth_accounts']['linkedin'] = array( 'access_token' => 'encrypted-token', 'profile' => array( 'id' => 'li-123', 'name' => 'LinkedIn Tester' ) );
 $_POST = array( 'post_id' => '12', 'platforms' => array( 'linkedin', 'facebook' ), 'scheduled_at' => '2026-11-20T14:45' );
 try {

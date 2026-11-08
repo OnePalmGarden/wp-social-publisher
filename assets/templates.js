@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function () {
 		'{excerpt}': 'Bu alanda yazının özeti gösterilir. Yazı metni ve görseller, platforma göre ayrıca biçimlendirilir.',
 		'{url}': 'https://ornek-site.com/ornek-yazi/',
 		'{tags}': 'WordPress, içerik, sosyal medya',
+		'{hashtags}': '#WordPress #içerik #sosyalmedya',
 		'{site_title}': 'Örnek Site'
 	};
 	let activePanel = panels.find(function (panel) {
@@ -25,7 +26,7 @@ document.addEventListener('DOMContentLoaded', function () {
 		}
 		const parts = Array.from(activePanel.querySelectorAll('.wsp-template-input'))
 			.map(function (input) {
-				return input.value.trim().replace(/\{title\}|\{excerpt\}|\{url\}|\{tags\}|\{site_title\}/g, function (tag) {
+				return input.value.trim().replace(/\{title\}|\{excerpt\}|\{url\}|\{tags\}|\{hashtags\}|\{site_title\}/g, function (tag) {
 					return smartValues[tag];
 				});
 			})
