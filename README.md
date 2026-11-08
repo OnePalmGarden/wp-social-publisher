@@ -4,7 +4,9 @@ WordPress yazıları için Twitter / X, LinkedIn, Facebook, Medium ve Substack p
 
 ## Bu sürümde
 
-Sürüm 0.5.0, X ve LinkedIn kullanıcı hesapları için resmi OAuth 2.0 giriş ve profil doğrulaması sunar; Facebook Sayfası bağlantısı önceki Sayfa erişim belirteci formuyla sürer. Kimlik doğrulama, bir hesabın yazı paylaşma erişimine sahip olduğunu garanti etmez. Eklenti hiçbir platforma otomatik gönderim yapmaz; Facebook'taki tekil gönderi akışı ayrıca kullanıcı onayı ister. Planlanan tarihler yalnızca WordPress'te saklanır ve takvimde listelenir.
+Sürüm 0.6.0; X ve LinkedIn kullanıcı hesapları için resmi OAuth 2.0 giriş ve profil doğrulaması sunar, Facebook Sayfası bağlantısı önceki Sayfa erişim belirteci formuyla sürer. **Share Now**, Facebook ve LinkedIn'e tekil gönderi için önce önizleme sonra ayrı bir kullanıcı onayı ister. LinkedIn gönderileri, onaydan sonra Posts API'ye `w_member_social` yetkisiyle gönderilir. Hesap bağlantısı, uygulamanın LinkedIn'de **Share on LinkedIn** ürün iznini veya gönderi yetkisini garanti etmez. Eklenti yazı yayımlanınca otomatik paylaşım yapmaz; planlanan tarihler yalnızca WordPress'te saklanır ve takvimde listelenir.
+
+**Logs** en son 200 Share Now gönderim girişimini platform, yazı, sonuç ve platform gönderi kimliğiyle listeler. Paylaşım metni ve erişim belirteçleri kayıtlara yazılmaz. Ağ hatalarında platform gönderimi almış olabilir; tekrar denemeden önce hedef hesabı kontrol edin.
 
 Medium ve Substack için şu an desteklenen resmi OAuth bağlantısı bulunmadığından eklenti parola istemez veya tarayıcı otomasyonu kullanmaz. İleride platformların desteklediği resmi bir yayınlama yöntemi sunulursa bu alan güncellenebilir.
 
@@ -61,7 +63,9 @@ Eklenti `users.read`, `tweet.read`, `tweet.write` ve `offline.access` izinlerini
 2. Eklentide LinkedIn'i seçin ve gösterilen **OAuth Redirect URI** adresini uygulamanızdaki Authorized redirect URLs listesine aynen ekleyin.
 3. LinkedIn'in verdiği **Client ID** ve **Client Secret** değerlerini eklentiye girip kaydedin.
 4. **LinkedIn ile güvenli giriş** düğmesine basıp yetkilendirin. Dönüşte OpenID Connect kullanıcı profili doğrulanır.
-5. **Bağlantıyı test et** düğmesi hesabı yeniden kontrol eder. Gönderi paylaşmak için LinkedIn'in ayrı **Share on LinkedIn** ürün izni gerekebilir; bu eklenti şu anda LinkedIn'e post göndermez.
+5. **Bağlantıyı test et** düğmesi hesabı yeniden kontrol eder. Gönderi paylaşmak için LinkedIn'in ayrı **Share on LinkedIn** ürün izni gerekir; erişim LinkedIn onayına bağlıdır.
+
+Bağlı hesaba deneme gönderisi için **Share Now** sayfasında LinkedIn'i ve yayımlanmış, şifresiz bir yazıyı seçin. Önizlemeyi inceleyin; gönderi ancak **Onayla ve LinkedIn'de paylaş** onayıyla yayımlanır. Yazı bağlantısı gönderi metnine eklenir. Başarı ve API hataları **Logs** sayfasına kaydedilir. LinkedIn uygulaması `w_member_social` iznine ve ürün erişimine sahip değilse LinkedIn isteği reddeder; bağlantı testi bu izni test etmez.
 
 ### Facebook Sayfası
 

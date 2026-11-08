@@ -47,6 +47,7 @@ function wp_remote_get( $url, $args ) { $GLOBALS['profile_request'] = array( $ur
 function wp_remote_post( $url, $args ) { $GLOBALS['token_request'] = array( $url, $args ); return $GLOBALS['token_response']; }
 function wp_remote_retrieve_body( $response ) { return $response['body']; }
 function wp_remote_retrieve_response_code( $response ) { return $response['code']; }
+function wp_remote_retrieve_header( $response, $header ) { return $response['headers'][strtolower( $header )] ?? ''; }
 function get_post( $id ) { return $GLOBALS['test_post'] ?? null; }
 function get_current_user_id() { return 7; }
 function check_admin_referer( $action ) { if ( ! $GLOBALS['nonce_valid'] ) { throw new RuntimeException( 'invalid nonce' ); } }
@@ -57,7 +58,7 @@ function delete_option( $key ) { unset( $GLOBALS['options'][ $key ] ); return tr
 function wp_safe_redirect( $url ) { throw new RuntimeException( 'redirect: ' . $url ); }
 function wp_redirect( $url, $status, $x_redirect_by ) { $GLOBALS['external_redirect'] = $url; throw new RuntimeException( 'external redirect' ); }
 function wp_die( $message ) { throw new RuntimeException( 'die: ' . $message ); }
-function wp_generate_password( $length, $special, $extra ) { return str_repeat( 'a', $length ); }
+function wp_generate_password( $length, $special, $extra ) { return $GLOBALS['password_override'] ?? str_repeat( 'a', $length ); }
 function wp_basename( $path ) { return basename( $path ); }
 function wp_http_validate_url( $url ) { return filter_var( $url, FILTER_VALIDATE_URL ); }
 function add_option( $key, $value, $deprecated, $autoload ) {
@@ -208,14 +209,14 @@ expect( is_wp_error( $response ) && str_contains( $response->get_error_message()
 $GLOBALS['test_post'] = $post;
 $GLOBALS['nonce_valid'] = true;
 $GLOBALS['response'] = array( 'code' => 200, 'body' => '{"id":"123_456"}' );
-$_POST = array( 'post_id' => '12' );
+$_POST = array( 'platform' => 'facebook', 'post_id' => '12' );
 ob_start();
 wsp_facebook_preview();
 $confirmation = ob_get_clean();
 expect( str_contains( $confirmation, 'Eski özel metin' ) && str_contains( $confirmation, 'Onayla ve Facebook' ), 'Paylaşım öncesi doğru mesaj ve onay gösterilmeli' );
 $draft_id = str_repeat( 'a', 32 );
 expect( isset( $GLOBALS['transients']['wsp_fb_draft_' . $draft_id] ), 'Onay için sunucuda taslak saklanmalı' );
-$_POST = array( 'draft' => $draft_id );
+$_POST = array( 'draft' => $draft_id, 'platform' => 'facebook' );
 $GLOBALS['nonce_valid'] = false;
 try {
 	wsp_facebook_publish();
@@ -238,6 +239,7 @@ try {
 	wsp_facebook_publish();
 } catch ( RuntimeException $error ) {}
 expect( null === $GLOBALS['request'], 'Tekrarlanan onay Meta isteği göndermemeli' );
+expect( 'Başarılı' === get_option( 'wsp_delivery_logs' )[0]['status'] && '123_456' === get_option( 'wsp_delivery_logs' )[0]['remote_id'], 'Başarılı Facebook gönderimi Logs kaydına yazılmalı' );
 
 $_GET = array( 'page' => 'wsp-templates' );
 wsp_admin_assets( 'unused-hook-name' );
@@ -380,6 +382,45 @@ try {
 }
 expect( 'linkedin-client' === $GLOBALS['token_request'][1]['body']['client_id'] && 'linkedin-secret' === $GLOBALS['token_request'][1]['body']['client_secret'], 'LinkedIn token isteği uygulama bilgilerini kullanmalı' );
 expect( 'li-123' === get_option( 'wsp_oauth_accounts' )['linkedin']['profile']['id'], 'LinkedIn profili doğrulanıp kaydedilmeli' );
+$GLOBALS['password_override'] = str_repeat( 'b', 32 );
+$_POST = array( 'platform' => 'linkedin', 'post_id' => '12' );
+$GLOBALS['response'] = array( 'code' => 201, 'body' => '', 'headers' => array( 'x-restli-id' => 'urn:li:share:789' ) );
+ob_start();
+wsp_facebook_preview();
+$linkedin_confirmation = ob_get_clean();
+expect( str_contains( $linkedin_confirmation, 'LinkedIn: Deneme başlığı' ) && str_contains( $linkedin_confirmation, 'Onayla ve LinkedIn' ), 'LinkedIn önizlemesi onay adımını göstermeli' );
+$linkedin_draft_id = str_repeat( 'b', 32 );
+$linkedin_draft = get_transient( 'wsp_fb_draft_' . $linkedin_draft_id );
+expect( is_array( $linkedin_draft ) && str_contains( $linkedin_draft['message'], 'https://example.test/deneme/' ), 'LinkedIn gönderi metnine yazı bağlantısı eklenmeli' );
+$_POST = array( 'draft' => $linkedin_draft_id, 'platform' => 'linkedin' );
+try {
+	wsp_facebook_publish();
+} catch ( RuntimeException $error ) {
+	expect( str_starts_with( $error->getMessage(), 'redirect:' ), 'Başarılı LinkedIn gönderimi yönlendirmeli' );
+}
+expect( 'https://api.linkedin.com/rest/posts' === $GLOBALS['request'][0], 'LinkedIn Posts API kullanılmalı' );
+expect( 'Bearer li-access' === $GLOBALS['request'][1]['headers']['Authorization'] && '202511' === $GLOBALS['request'][1]['headers']['LinkedIn-Version'], 'LinkedIn istek belirteci ve API sürümü başlıklarını kullanmalı' );
+$linkedin_payload = json_decode( $GLOBALS['request'][1]['body'], true );
+expect( 'urn:li:person:li-123' === $linkedin_payload['author'] && 'PUBLISHED' === $linkedin_payload['lifecycleState'], 'LinkedIn API yükü doğru yazarla yayınlanmalı' );
+expect( 'Başarılı' === get_option( 'wsp_delivery_logs' )[0]['status'] && 'urn:li:share:789' === get_option( 'wsp_delivery_logs' )[0]['remote_id'], 'Başarılı LinkedIn gönderimi Logs kaydına yazılmalı' );
+expect( ! str_contains( json_encode( get_option( 'wsp_delivery_logs' ) ), 'li-access' ), 'Logs kayıtları erişim belirteci içermemeli' );
+ob_start();
+wsp_logs_page();
+$logs_page = ob_get_clean();
+expect( str_contains( $logs_page, 'urn:li:share:789' ) && str_contains( $logs_page, 'Deneme başlığı' ), 'Logs ekranı LinkedIn gönderi sonucunu göstermeli' );
+$GLOBALS['password_override'] = str_repeat( 'c', 32 );
+$_POST = array( 'platform' => 'linkedin', 'post_id' => '12' );
+ob_start();
+wsp_facebook_preview();
+ob_end_clean();
+$_POST = array( 'draft' => str_repeat( 'c', 32 ), 'platform' => 'linkedin' );
+$GLOBALS['response'] = array( 'code' => 403, 'body' => '{"message":"li-access"}' );
+try {
+	wsp_facebook_publish();
+} catch ( RuntimeException $error ) {
+	expect( str_starts_with( $error->getMessage(), 'redirect:' ), 'LinkedIn API hatası kullanıcıya bildirilmeli' );
+}
+expect( 'Başarısız' === get_option( 'wsp_delivery_logs' )[0]['status'] && ! str_contains( json_encode( get_option( 'wsp_delivery_logs' )[0] ), 'li-access' ), 'LinkedIn hatası belirteç sızdırmadan Logs içine yazılmalı' );
 $_POST = array( 'platform' => 'linkedin' );
 $GLOBALS['profile_response'] = array( 'code' => 200, 'body' => '{"sub":"li-123","name":"LinkedIn Tester"}' );
 try {

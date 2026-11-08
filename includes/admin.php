@@ -12,7 +12,7 @@ function wsp_admin_menu(): void {
 	add_submenu_page( 'wsp-accounts', 'Şimdi paylaş', 'Share Now', 'manage_options', 'wsp-share-now', 'wsp_share_now_page' );
 	add_submenu_page( 'wsp-accounts', 'Takvim', 'Calendar', 'manage_options', 'wsp-calendar', 'wsp_calendar_page' );
 	add_submenu_page( 'wsp-accounts', 'Şablonlar', 'Templates', 'manage_options', 'wsp-templates', 'wsp_templates_page' );
-	add_submenu_page( 'wsp-accounts', 'Kayıtlar', 'Logs', 'manage_options', 'wsp-logs', 'wsp_placeholder_page' );
+	add_submenu_page( 'wsp-accounts', 'Kayıtlar', 'Logs', 'manage_options', 'wsp-logs', 'wsp_logs_page' );
 }
 add_action( 'admin_menu', 'wsp_admin_menu' );
 
@@ -25,7 +25,7 @@ function wsp_admin_assets( string $hook_suffix ): void {
 		return;
 	}
 	$base_url = plugin_dir_url( dirname( __DIR__ ) . '/wp-social-publisher.php' );
-	wp_enqueue_style( 'wsp-templates', $base_url . 'assets/templates.css', array(), '0.5.0' );
+	wp_enqueue_style( 'wsp-templates', $base_url . 'assets/templates.css', array(), '0.6.0' );
 	if ( 'wsp-templates' === $page ) {
 		wp_enqueue_script( 'wsp-templates', $base_url . 'assets/templates.js', array(), '0.3.0', true );
 	}
@@ -33,7 +33,7 @@ function wsp_admin_assets( string $hook_suffix ): void {
 add_action( 'admin_enqueue_scripts', 'wsp_admin_assets' );
 
 function wsp_notice(): void {
-	echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Deneme sürümü: Yalnızca Facebook Sayfasına elle onaylanan gönderim kullanılabilir. Otomatik paylaşım ve gönderim kuyruğu yoktur; tarihler yalnızca plan taslağıdır.', 'wp-social-publisher' ) . '</p></div>';
+	echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Facebook ve LinkedIn gönderileri yalnızca Share Now ekranında ayrıca onaylanınca paylaşılır. Otomatik paylaşım ve gönderim kuyruğu yoktur; tarihler yalnızca plan taslağıdır.', 'wp-social-publisher' ) . '</p></div>';
 }
 
 function wsp_placeholder_page(): void {
@@ -41,8 +41,7 @@ function wsp_placeholder_page(): void {
 	$pages = array(
 		'wsp-accounts'  => array( 'Accounts / Hesaplar', 'Hesap bağlantısı henüz eklenmedi. Bu sayfaya şifre veya erişim anahtarı girilmez.' ),
 		'wsp-auto-post' => array( 'WP Auto Post / Otomatik paylaşım', 'Otomatik paylaşım henüz kullanılamıyor.' ),
-		'wsp-share-now' => array( 'Share Now / Şimdi paylaş', 'Anında paylaşım henüz kullanılamıyor.' ),
-		'wsp-logs'      => array( 'Logs / Kayıtlar', 'Kalıcı gönderim geçmişi henüz eklenmedi. Facebook gönderiminin sonucu Şimdi paylaş ekranında gösterilir.' ),
+		'wsp-share-now' => array( 'Share Now / Şimdi paylaş', 'Şimdi paylaş sayfası yüklenemedi.' ),
 	);
 	if ( ! isset( $pages[ $page ] ) ) {
 		return;
@@ -50,6 +49,53 @@ function wsp_placeholder_page(): void {
 	echo '<div class="wrap"><h1>' . esc_html( $pages[ $page ][0] ) . '</h1>';
 	wsp_notice();
 	echo '<p>' . esc_html( $pages[ $page ][1] ) . '</p></div>';
+}
+
+function wsp_logs_page(): void {
+	$logs = get_option( 'wsp_delivery_logs', array() );
+	$logs = is_array( $logs ) ? $logs : array();
+	$page = isset( $_GET['paged'] ) && is_scalar( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
+	$page_size = 25;
+	$total = count( $logs );
+	$items = array_slice( $logs, ( $page - 1 ) * $page_size, $page_size );
+	?>
+	<div class="wrap">
+		<h1><?php esc_html_e( 'Logs / Gönderim kayıtları', 'wp-social-publisher' ); ?></h1>
+		<?php wsp_notice(); ?>
+		<p><?php esc_html_e( 'Son 200 gönderim denemesi burada saklanır. Taslak hazırlama ve bağlantı testleri gönderim kaydı oluşturmaz.', 'wp-social-publisher' ); ?></p>
+		<table class="widefat striped">
+			<thead><tr>
+				<th><?php esc_html_e( 'Tarih (UTC)', 'wp-social-publisher' ); ?></th>
+				<th><?php esc_html_e( 'Platform', 'wp-social-publisher' ); ?></th>
+				<th><?php esc_html_e( 'Yazı', 'wp-social-publisher' ); ?></th>
+				<th><?php esc_html_e( 'Durum', 'wp-social-publisher' ); ?></th>
+				<th><?php esc_html_e( 'Açıklama', 'wp-social-publisher' ); ?></th>
+				<th><?php esc_html_e( 'Platform gönderi kimliği', 'wp-social-publisher' ); ?></th>
+			</tr></thead>
+			<tbody>
+			<?php foreach ( $items as $item ) : ?>
+				<tr>
+					<td><?php echo esc_html( isset( $item['created_at'] ) ? $item['created_at'] : '' ); ?></td>
+					<td><?php echo esc_html( isset( $item['platform_name'] ) ? $item['platform_name'] : '' ); ?></td>
+					<td><?php if ( ! empty( $item['post_id'] ) ) : ?><a href="<?php echo esc_url( get_edit_post_link( (int) $item['post_id'] ) ); ?>"><?php echo esc_html( isset( $item['post_title'] ) ? $item['post_title'] : '' ); ?></a><?php endif; ?></td>
+					<td><?php echo esc_html( isset( $item['status'] ) ? $item['status'] : '' ); ?></td>
+					<td><?php echo esc_html( isset( $item['message'] ) ? $item['message'] : '' ); ?></td>
+					<td><?php echo esc_html( isset( $item['remote_id'] ) ? $item['remote_id'] : '' ); ?></td>
+				</tr>
+			<?php endforeach; ?>
+			<?php if ( ! $items ) : ?><tr><td colspan="6"><?php esc_html_e( 'Henüz gönderim denemesi yok.', 'wp-social-publisher' ); ?></td></tr><?php endif; ?>
+			</tbody>
+		</table>
+		<?php
+		echo wp_kses_post( paginate_links( array(
+			'base'    => add_query_arg( 'paged', '%#%', admin_url( 'admin.php?page=wsp-logs' ) ),
+			'format'  => '',
+			'current' => $page,
+			'total'   => (int) ceil( $total / $page_size ),
+		) ) );
+		?>
+	</div>
+	<?php
 }
 
 function wsp_templates_page(): void {

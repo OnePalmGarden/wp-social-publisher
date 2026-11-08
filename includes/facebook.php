@@ -149,23 +149,90 @@ function wsp_facebook_disconnect(): void {
 }
 add_action( 'admin_post_wsp_facebook_disconnect', 'wsp_facebook_disconnect' );
 
+function wsp_shareable_platforms(): array {
+	$available = array();
+	$facebook = get_option( 'wsp_facebook_account', array() );
+	if ( is_array( $facebook ) && ! empty( $facebook['page_id'] ) && ! empty( $facebook['token'] ) ) {
+		$available['facebook'] = sprintf( 'Facebook — %s', ! empty( $facebook['name'] ) ? $facebook['name'] : $facebook['page_id'] );
+	}
+	$accounts = get_option( 'wsp_oauth_accounts', array() );
+	if ( is_array( $accounts ) && ! empty( $accounts['linkedin']['access_token'] ) && ! empty( $accounts['linkedin']['profile']['id'] ) ) {
+		$name = ! empty( $accounts['linkedin']['profile']['name'] ) ? $accounts['linkedin']['profile']['name'] : $accounts['linkedin']['profile']['id'];
+		$available['linkedin'] = sprintf( 'LinkedIn — %s', $name );
+	}
+	return $available;
+}
+
+function wsp_delivery_log_add( array $entry ): bool {
+	$logs = get_option( 'wsp_delivery_logs', array() );
+	$logs = is_array( $logs ) ? $logs : array();
+	array_unshift( $logs, $entry );
+	$logs = array_slice( $logs, 0, 200 );
+	update_option( 'wsp_delivery_logs', $logs, false );
+	return get_option( 'wsp_delivery_logs' ) === $logs;
+}
+
+function wsp_delivery_log_update( string $id, array $changes ): bool {
+	$logs = get_option( 'wsp_delivery_logs', array() );
+	if ( ! is_array( $logs ) ) {
+		return false;
+	}
+	foreach ( $logs as &$entry ) {
+		if ( isset( $entry['id'] ) && $id === $entry['id'] ) {
+			$entry = array_merge( $entry, $changes );
+			unset( $entry );
+			update_option( 'wsp_delivery_logs', $logs, false );
+			return get_option( 'wsp_delivery_logs' ) === $logs;
+		}
+	}
+	unset( $entry );
+	return false;
+}
+
+function wsp_share_platform_account( string $platform ) {
+	if ( 'facebook' === $platform ) {
+		return wsp_facebook_account();
+	}
+	if ( 'linkedin' === $platform ) {
+		$account = wsp_oauth_account( 'linkedin' );
+		if ( is_wp_error( $account ) ) {
+			return $account;
+		}
+		if ( empty( $account['profile']['id'] ) || ! is_string( $account['profile']['id'] ) ) {
+			return new WP_Error( 'linkedin_profile_missing', 'LinkedIn hesap profili eksik. Hesabı yeniden bağlayın.' );
+		}
+		return $account;
+	}
+	return new WP_Error( 'unsupported_platform', 'Bu platformda anında paylaşım desteklenmiyor.' );
+}
+
+function wsp_share_platform_name( string $platform, array $account ): string {
+	return 'facebook' === $platform
+		? sprintf( 'Facebook — %s', ! empty( $account['name'] ) ? $account['name'] : $account['page_id'] )
+		: sprintf( 'LinkedIn — %s', ! empty( $account['profile']['name'] ) ? $account['profile']['name'] : $account['profile']['id'] );
+}
+
 function wsp_share_now_page(): void {
-	$account = wsp_facebook_account();
+	$platforms = wsp_shareable_platforms();
 	$query = new WP_Query( array( 'post_type' => 'post', 'post_status' => 'publish', 'posts_per_page' => 100, 'orderby' => 'date', 'order' => 'DESC', 'has_password' => false ) );
 	?>
 	<div class="wrap">
 		<h1><?php esc_html_e( 'Share Now / Şimdi paylaş', 'wp-social-publisher' ); ?></h1>
 		<?php wsp_facebook_notice(); wsp_notice(); ?>
-		<p><?php esc_html_e( 'Facebook Sayfasına yayınlanmış bir yazıyı seçin. Önce mesaj ve bağlantı gösterilecek; yalnızca sonraki ekrandaki onayla gönderim yapılacaktır.', 'wp-social-publisher' ); ?></p>
-		<?php if ( is_wp_error( $account ) ) : ?>
-			<p><?php echo esc_html( $account->get_error_message() ); ?></p>
+		<p><?php esc_html_e( 'Bağlı platformda yayımlanmış bir yazı seçin. Gönderi önce önizlenir; yalnızca ikinci ekrandaki onayla paylaşılır.', 'wp-social-publisher' ); ?></p>
+		<?php if ( ! $platforms ) : ?>
+			<p><?php esc_html_e( 'Önce Accounts sayfasından Facebook veya LinkedIn hesabı bağlayın.', 'wp-social-publisher' ); ?></p>
 		<?php elseif ( ! $query->posts ) : ?>
 			<p><?php esc_html_e( 'Paylaşılabilecek yayımlanmış ve şifresiz yazı bulunamadı.', 'wp-social-publisher' ); ?></p>
 		<?php else : ?>
-			<p><?php echo esc_html( sprintf( __( 'Hedef Sayfa: %s', 'wp-social-publisher' ), $account['name'] ) ); ?></p>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<input type="hidden" name="action" value="wsp_facebook_preview">
 				<?php wp_nonce_field( 'wsp_facebook_preview' ); ?>
+				<p><label for="wsp-platform"><?php esc_html_e( 'Platform ve hesap', 'wp-social-publisher' ); ?></label><br>
+					<select id="wsp-platform" name="platform" required>
+						<?php foreach ( $platforms as $key => $label ) : ?><option value="<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></option><?php endforeach; ?>
+					</select>
+				</p>
 				<label for="wsp-post-id"><?php esc_html_e( 'Yazı seçin (en son 100 yazı)', 'wp-social-publisher' ); ?></label>
 				<select id="wsp-post-id" name="post_id" required>
 					<?php foreach ( $query->posts as $post ) : ?><option value="<?php echo esc_attr( (string) $post->ID ); ?>"><?php echo esc_html( get_the_title( $post ) ); ?></option><?php endforeach; ?>
@@ -179,36 +246,56 @@ function wsp_share_now_page(): void {
 
 function wsp_facebook_preview(): void {
 	wsp_facebook_admin_check( 'wsp_facebook_preview' );
-	$account = wsp_facebook_account();
+	$platform = isset( $_POST['platform'] ) && is_string( $_POST['platform'] ) ? sanitize_key( wp_unslash( $_POST['platform'] ) ) : '';
+	$platforms = wsp_shareable_platforms();
+	if ( ! isset( $platforms[ $platform ] ) ) {
+		wsp_facebook_redirect( 'wsp-share-now', 'Önce desteklenen bir platformu bağlayın.', true );
+	}
+	$account = wsp_share_platform_account( $platform );
 	$post_id = isset( $_POST['post_id'] ) && is_scalar( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
 	$post = get_post( $post_id );
 	if ( is_wp_error( $account ) || ! $post || 'post' !== $post->post_type || 'publish' !== $post->post_status || '' !== $post->post_password || ! current_user_can( 'edit_post', $post_id ) ) {
 		wsp_facebook_redirect( 'wsp-share-now', 'Hesap veya yayımlanmış şifresiz yazı bulunamadı.', true );
 	}
-	$custom = (string) get_post_meta( $post_id, '_wsp_facebook_text', true );
-	$message = wsp_render_template( '' !== $custom ? $custom : wsp_template( 'facebook' ), $post );
+	$custom = (string) get_post_meta( $post_id, '_wsp_' . $platform . '_text', true );
+	$message = wsp_render_template( '' !== $custom ? $custom : wsp_template( $platform ), $post );
 	$link = get_permalink( $post );
 	if ( '' === trim( $message ) || ! is_string( $link ) || ! wp_http_validate_url( $link ) ) {
 		wsp_facebook_redirect( 'wsp-share-now', 'Mesaj veya yazı bağlantısı geçersiz.', true );
 	}
+	if ( 'linkedin' === $platform && ! str_contains( $message, $link ) ) {
+		$message = rtrim( $message ) . "\n\n" . $link;
+	}
 	$id = wp_generate_password( 32, false, false );
-	$draft = array( 'user_id' => get_current_user_id(), 'page_id' => $account['page_id'], 'post_id' => $post_id, 'message' => $message, 'link' => $link );
+	$draft = array(
+		'user_id'    => get_current_user_id(),
+		'platform'   => $platform,
+		'target_id'  => 'facebook' === $platform ? $account['page_id'] : $account['profile']['id'],
+		'target'     => wsp_share_platform_name( $platform, $account ),
+		'post_id'    => $post_id,
+		'post_title' => sanitize_text_field( get_the_title( $post ) ),
+		'message'    => $message,
+		'link'       => $link,
+	);
 	if ( ! set_transient( 'wsp_fb_draft_' . $id, $draft, 10 * MINUTE_IN_SECONDS ) ) {
 		wsp_facebook_redirect( 'wsp-share-now', 'Önizleme kaydedilemedi. Lütfen tekrar deneyin.', true );
 	}
 	?>
 	<div class="wrap">
-		<h1><?php esc_html_e( 'Facebook gönderisini onayla', 'wp-social-publisher' ); ?></h1>
-		<p><strong><?php esc_html_e( 'Hedef Sayfa:', 'wp-social-publisher' ); ?></strong> <?php echo esc_html( $account['name'] ); ?></p>
+		<h1><?php echo esc_html( sprintf( __( '%s gönderisini onayla', 'wp-social-publisher' ), $platforms[ $platform ] ) ); ?></h1>
+		<p><strong><?php esc_html_e( 'Hedef hesap:', 'wp-social-publisher' ); ?></strong> <?php echo esc_html( $draft['target'] ); ?></p>
 		<p><strong><?php esc_html_e( 'Mesaj:', 'wp-social-publisher' ); ?></strong></p>
 		<div style="white-space:pre-wrap;background:#fff;border:1px solid #dcdcde;padding:15px;max-width:700px"><?php echo esc_html( $message ); ?></div>
-		<p><strong><?php esc_html_e( 'Bağlantı:', 'wp-social-publisher' ); ?></strong> <?php echo esc_html( $link ); ?></p>
-		<p><?php esc_html_e( 'Onayladığınızda bu gönderi hemen Facebook Sayfasında yayımlanır. Görsel ayrıca yüklenmez. Meta bağlantı önizlemesini kendi kurallarına göre oluşturabilir.', 'wp-social-publisher' ); ?></p>
+		<?php if ( 'facebook' === $platform ) : ?>
+			<p><strong><?php esc_html_e( 'Bağlantı eki:', 'wp-social-publisher' ); ?></strong> <?php echo esc_html( $link ); ?></p>
+		<?php endif; ?>
+		<p><?php echo esc_html( sprintf( __( 'Onayladığınızda bu gönderi hemen %s hesabında yayımlanır. Paylaşım otomatik değildir.', 'wp-social-publisher' ), $platforms[ $platform ] ) ); ?></p>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="wsp_facebook_publish">
 			<input type="hidden" name="draft" value="<?php echo esc_attr( $id ); ?>">
+			<input type="hidden" name="platform" value="<?php echo esc_attr( $platform ); ?>">
 			<?php wp_nonce_field( 'wsp_facebook_publish_' . $id ); ?>
-			<?php submit_button( __( 'Onayla ve Facebook’ta paylaş', 'wp-social-publisher' ) ); ?>
+			<?php submit_button( 'facebook' === $platform ? __( 'Onayla ve Facebook’ta paylaş', 'wp-social-publisher' ) : __( 'Onayla ve LinkedIn’de paylaş', 'wp-social-publisher' ) ); ?>
 		</form>
 		<a href="<?php echo esc_url( admin_url( 'admin.php?page=wsp-share-now' ) ); ?>"><?php esc_html_e( 'İptal', 'wp-social-publisher' ); ?></a>
 	</div>
@@ -223,8 +310,13 @@ function wsp_facebook_publish(): void {
 	}
 	wsp_facebook_admin_check( 'wsp_facebook_publish_' . $id );
 	$draft = get_transient( 'wsp_fb_draft_' . $id );
-	$account = wsp_facebook_account();
-	if ( ! is_array( $draft ) || is_wp_error( $account ) || get_current_user_id() !== $draft['user_id'] || $account['page_id'] !== $draft['page_id'] || ! current_user_can( 'edit_post', $draft['post_id'] ) ) {
+	$platform = isset( $_POST['platform'] ) && is_string( $_POST['platform'] ) ? sanitize_key( wp_unslash( $_POST['platform'] ) ) : '';
+	$account = wsp_share_platform_account( $platform );
+	if ( ! is_array( $draft ) || ! isset( $draft['user_id'], $draft['platform'], $draft['target_id'], $draft['post_id'], $draft['post_title'], $draft['message'], $draft['link'] ) || is_wp_error( $account ) ) {
+		wsp_facebook_redirect( 'wsp-share-now', 'Önizleme geçersiz, süresi dolmuş veya hesap değişmiş. Yeniden önizleyin.', true );
+	}
+	$current_target_id = 'facebook' === $platform ? $account['page_id'] : $account['profile']['id'];
+	if ( get_current_user_id() !== $draft['user_id'] || $platform !== $draft['platform'] || $current_target_id !== $draft['target_id'] || ! current_user_can( 'edit_post', $draft['post_id'] ) ) {
 		wsp_facebook_redirect( 'wsp-share-now', 'Önizleme geçersiz, süresi dolmuş veya hesap değişmiş. Yeniden önizleyin.', true );
 	}
 	$post = get_post( $draft['post_id'] );
@@ -232,16 +324,45 @@ function wsp_facebook_publish(): void {
 		wsp_facebook_redirect( 'wsp-share-now', 'Yazı durumu veya bağlantısı değişti. Gönderi yapılmadı; yeniden önizleyin.', true );
 	}
 	if ( ! add_option( 'wsp_fb_attempt_' . $id, time(), '', false ) ) {
-		wsp_facebook_redirect( 'wsp-share-now', 'Bu onay zaten kullanılmış veya gönderim kaydı oluşturulamamış. Yinelenmeyi önlemek için Facebook Sayfasını kontrol edin.', true );
+		wsp_facebook_redirect( 'wsp-share-now', 'Bu onay zaten kullanılmış veya gönderim kaydı oluşturulamamış. Yinelenmeyi önlemek için hedef hesabı kontrol edin.', true );
 	}
 	delete_transient( 'wsp_fb_draft_' . $id );
-	$result = wsp_facebook_request( $account['page_id'] . '/feed', $account['token'], 'POST', array( 'message' => $draft['message'], 'link' => $draft['link'] ) );
+	$log = array(
+		'id'          => $id,
+		'created_at'  => gmdate( 'Y-m-d H:i:s' ),
+		'platform'    => $platform,
+		'platform_name' => wsp_platforms()[ $platform ],
+		'post_id'     => $draft['post_id'],
+		'post_title'  => $draft['post_title'],
+		'status'      => 'Gönderiliyor',
+		'message'     => 'Kullanıcı onayı alındı.',
+		'remote_id'   => '',
+	);
+	if ( ! wsp_delivery_log_add( $log ) ) {
+		delete_option( 'wsp_fb_attempt_' . $id );
+		wsp_facebook_redirect( 'wsp-share-now', 'Gönderim kaydı oluşturulamadı. Güvenlik için gönderi yapılmadı.', true );
+	}
+	$result = 'facebook' === $platform
+		? wsp_facebook_request( $account['page_id'] . '/feed', $account['token'], 'POST', array( 'message' => $draft['message'], 'link' => $draft['link'] ) )
+		: wsp_linkedin_publish_post( $account['access_token'], (string) $draft['target_id'], $draft['message'] );
 	if ( is_wp_error( $result ) ) {
-		wsp_facebook_redirect( 'wsp-share-now', $result->get_error_message(), true );
+		$error_message = $result->get_error_message();
+		$status = str_contains( strtolower( $error_message ), 'belirsiz' ) ? 'Belirsiz' : 'Başarısız';
+		$logged = wsp_delivery_log_update( $id, array( 'status' => $status, 'message' => $error_message ) );
+		if ( ! $logged ) {
+			$error_message .= ' Logs kaydı güncellenemedi; hedef hesabı kontrol edin.';
+		}
+		wsp_facebook_redirect( 'wsp-share-now', $error_message, true );
 	}
-	if ( ! isset( $result['id'] ) || ! is_string( $result['id'] ) || '' === $result['id'] ) {
-		wsp_facebook_redirect( 'wsp-share-now', 'Meta gönderi kimliği döndürmedi. Sonuç belirsiz; tekrar denemeden önce Facebook Sayfasını kontrol edin.', true );
+	$remote_id = isset( $result['id'] ) && is_string( $result['id'] ) ? $result['id'] : '';
+	if ( '' === $remote_id ) {
+		wsp_delivery_log_update( $id, array( 'status' => 'Belirsiz', 'message' => 'Platform gönderi kimliği döndürmedi; tekrar denemeden önce hedef hesabı kontrol edin.' ) );
+		wsp_facebook_redirect( 'wsp-share-now', 'Platform gönderi kimliği döndürmedi. Sonuç belirsiz; tekrar denemeden önce hedef hesabı kontrol edin.', true );
 	}
-	wsp_facebook_redirect( 'wsp-share-now', 'Facebook gönderisi oluşturuldu. Gönderi kimliği: ' . sanitize_text_field( $result['id'] ) );
+	$success = wsp_delivery_log_update( $id, array( 'status' => 'Başarılı', 'message' => 'Gönderi platform tarafından oluşturuldu.', 'remote_id' => sanitize_text_field( $remote_id ) ) );
+	if ( ! $success ) {
+		wsp_facebook_redirect( 'wsp-share-now', 'Gönderi oluşturuldu ancak Logs kaydı güncellenemedi. Hedef hesabı kontrol edin.', true );
+	}
+	wsp_facebook_redirect( 'wsp-share-now', $log['platform_name'] . ' gönderisi oluşturuldu. Logs sayfasında kaydı görebilirsiniz.' );
 }
 add_action( 'admin_post_wsp_facebook_publish', 'wsp_facebook_publish' );

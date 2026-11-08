@@ -100,6 +100,60 @@ function wsp_oauth_account( string $platform ) {
 	return $account;
 }
 
+function wsp_linkedin_publish_post( string $access_token, string $person_id, string $commentary ) {
+	if ( '' === $access_token || ! preg_match( '/^[A-Za-z0-9._:-]{1,200}$/', $person_id ) || '' === trim( $commentary ) ) {
+		return new WP_Error( 'linkedin_invalid_post', 'LinkedIn gönderi bilgileri geçersiz.' );
+	}
+	$body = wp_json_encode(
+		array(
+			'author'                   => 'urn:li:person:' . $person_id,
+			'commentary'               => $commentary,
+			'visibility'               => 'PUBLIC',
+			'distribution'             => array(
+				'feedDistribution'               => 'MAIN_FEED',
+				'targetEntities'                 => array(),
+				'thirdPartyDistributionChannels' => array(),
+			),
+			'lifecycleState'           => 'PUBLISHED',
+			'isReshareDisabledByAuthor' => false,
+		)
+	);
+	if ( ! is_string( $body ) ) {
+		return new WP_Error( 'linkedin_invalid_post', 'Gönderi metni LinkedIn için kodlanamadı.' );
+	}
+	$response = wp_remote_request(
+		'https://api.linkedin.com/rest/posts',
+		array(
+			'method'      => 'POST',
+			'timeout'     => 30,
+			'redirection' => 0,
+			'headers'     => array(
+				'Authorization'             => 'Bearer ' . $access_token,
+				'Accept'                    => 'application/json',
+				'Content-Type'              => 'application/json',
+				'LinkedIn-Version'          => '202511',
+				'X-Restli-Protocol-Version' => '2.0.0',
+			),
+			'body'        => $body,
+		)
+	);
+	if ( is_wp_error( $response ) ) {
+		return new WP_Error( 'linkedin_network', 'LinkedIn bağlantısında hata oluştu. Gönderim sonucu belirsiz olabilir; tekrar denemeden önce hesabınızı kontrol edin.' );
+	}
+	$status = wp_remote_retrieve_response_code( $response );
+	$data = json_decode( wp_remote_retrieve_body( $response ), true );
+	if ( 201 !== $status ) {
+		return new WP_Error( 'linkedin_publish_failed', 'LinkedIn gönderiyi kabul etmedi (HTTP ' . (int) $status . '). Share on LinkedIn ürün iznini, w_member_social kapsamını ve uygulama erişimini kontrol edin. Tekrar denemeden önce hesabınızı kontrol edin.' );
+	}
+	$remote_id = wp_remote_retrieve_header( $response, 'x-restli-id' );
+	if ( ! is_string( $remote_id ) || '' === $remote_id ) {
+		$remote_id = is_array( $data ) && isset( $data['id'] ) && is_string( $data['id'] ) ? $data['id'] : '';
+	}
+	return '' === $remote_id
+		? array()
+		: array( 'id' => sanitize_text_field( $remote_id ) );
+}
+
 function wsp_oauth_profile( string $platform, string $access_token ) {
 	$providers = wsp_oauth_providers();
 	if ( ! isset( $providers[ $platform ] ) ) {
