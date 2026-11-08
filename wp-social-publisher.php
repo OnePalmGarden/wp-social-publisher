@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Social Publisher
  * Description: Yazılar için platform bazlı sosyal paylaşım metinleri ve planlama taslağı.
- * Version: 0.2.0
+ * Version: 0.3.0
  * Requires at least: 6.2
  * Requires PHP: 8.0
  * Author: OnePalmGarden
@@ -18,20 +18,53 @@ require_once __DIR__ . '/includes/admin.php';
 
 function wsp_platforms(): array {
 	return array(
-		'facebook'  => 'Facebook',
-		'instagram' => 'Instagram',
-		'linkedin'  => 'LinkedIn',
-		'medium'    => 'Medium',
-		'substack'  => 'Substack',
+		'x'        => 'Twitter / X',
+		'linkedin' => 'LinkedIn',
+		'facebook' => 'Facebook',
+		'medium'   => 'Medium',
+		'substack' => 'Substack',
 	);
 }
 
-function wsp_template( string $platform ): string {
+function wsp_default_template_fields(): array {
+	return array(
+		'content' => "{title}\n\n{excerpt}",
+		'url'     => '{url}',
+		'tags'    => '{tags}',
+	);
+}
+
+function wsp_template_fields( string $platform ): array {
 	$templates = get_option( 'wsp_templates', array() );
-	if ( is_array( $templates ) && isset( $templates[ $platform ] ) && is_string( $templates[ $platform ] ) ) {
-		return $templates[ $platform ];
+	$fields = wsp_default_template_fields();
+	if ( ! is_array( $templates ) || ! isset( $templates[ $platform ] ) ) {
+		return $fields;
 	}
-	return "{title}\n\n{excerpt}\n\n{url}\n\n{tags}";
+
+	$saved = $templates[ $platform ];
+	if ( is_string( $saved ) ) {
+		$legacy_default = "{title}\n\n{excerpt}\n\n{url}\n\n{tags}";
+		if ( $legacy_default === $saved ) {
+			return $fields;
+		}
+		$fields['content'] = $saved;
+		$fields['url'] = '';
+		$fields['tags'] = '';
+		return $fields;
+	}
+
+	if ( is_array( $saved ) ) {
+		foreach ( array_keys( $fields ) as $field ) {
+			if ( isset( $saved[ $field ] ) && is_string( $saved[ $field ] ) ) {
+				$fields[ $field ] = $saved[ $field ];
+			}
+		}
+	}
+	return $fields;
+}
+
+function wsp_template( string $platform ): string {
+	return implode( "\n\n", array_filter( wsp_template_fields( $platform ), static fn( $field ) => '' !== trim( $field ) ) );
 }
 
 function wsp_render_template( string $template, WP_Post $post ): string {
@@ -49,6 +82,7 @@ function wsp_render_template( string $template, WP_Post $post ): string {
 			'{excerpt}' => wp_strip_all_tags( get_the_excerpt( $post ) ),
 			'{url}'     => get_permalink( $post ),
 			'{tags}'    => implode( ', ', $tag_names ),
+			'{site_title}' => get_bloginfo( 'name' ),
 		)
 	);
 }

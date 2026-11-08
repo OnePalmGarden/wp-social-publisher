@@ -16,6 +16,16 @@ function wsp_admin_menu(): void {
 }
 add_action( 'admin_menu', 'wsp_admin_menu' );
 
+function wsp_admin_assets( string $hook_suffix ): void {
+	if ( ! isset( $_GET['page'] ) || ! is_string( $_GET['page'] ) || 'wsp-templates' !== sanitize_key( wp_unslash( $_GET['page'] ) ) ) {
+		return;
+	}
+	$base_url = plugin_dir_url( dirname( __DIR__ ) . '/wp-social-publisher.php' );
+	wp_enqueue_style( 'wsp-templates', $base_url . 'assets/templates.css', array(), '0.3.0' );
+	wp_enqueue_script( 'wsp-templates', $base_url . 'assets/templates.js', array(), '0.3.0', true );
+}
+add_action( 'admin_enqueue_scripts', 'wsp_admin_assets' );
+
 function wsp_notice(): void {
 	echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Deneme sürümü: Bu eklenti henüz hesaplara bağlanmaz, otomatik paylaşım yapmaz ve gönderim kuyruğu çalıştırmaz. Tarihler yalnızca plan taslağıdır.', 'wp-social-publisher' ) . '</p></div>';
 }
@@ -37,22 +47,65 @@ function wsp_placeholder_page(): void {
 }
 
 function wsp_templates_page(): void {
+	$platforms = wsp_platforms();
+	$first_platform = array_key_first( $platforms );
 	?>
 	<div class="wrap">
 		<h1><?php esc_html_e( 'Templates / Paylaşım şablonları', 'wp-social-publisher' ); ?></h1>
 		<?php wsp_notice(); ?>
-		<p><?php esc_html_e( 'Her platformun varsayılan metnini oluşturun. Yazı düzenleyicisindeki özel metin, boş bırakılmadığında bu şablonun yerine kullanılır.', 'wp-social-publisher' ); ?></p>
-		<p><?php esc_html_e( '{title}: başlık; {excerpt}: özet; {url}: yazı bağlantısı; {tags}: yazı etiketleri (virgülle ayrılır, otomatik hashtag eklenmez). Görsel kaynağı yazının öne çıkan görselidir; şu an gönderilmez.', 'wp-social-publisher' ); ?></p>
+		<p><?php esc_html_e( 'Soldan platformu seçin, orta bölümdeki alanları düzenleyin ve sağdaki önizlemede sonucu görün. Yazı düzenleyicisindeki özel metin, varsayılan şablonun yerine kullanılır.', 'wp-social-publisher' ); ?></p>
+		<p><?php esc_html_e( 'Başlık, özet, bağlantı ve yazı etiketleri seçtiğiniz platforma gönderim aşamasında yazıdan alınacak şekilde yer tutucularla gösterilir. Şablona emoji, ek açıklama veya kendi etiketlerinizi normal metin olarak ekleyebilirsiniz. Görsel kaynağı öne çıkan görseldir; bu deneme sürümü görsel göndermez.', 'wp-social-publisher' ); ?></p>
 		<?php if ( isset( $_GET['updated'] ) && '1' === $_GET['updated'] ) : ?>
 			<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Şablonlar kaydedildi.', 'wp-social-publisher' ); ?></p></div>
 		<?php endif; ?>
-		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wsp-template-builder">
 			<input type="hidden" name="action" value="wsp_save_templates">
 			<?php wp_nonce_field( 'wsp_save_templates' ); ?>
-			<?php foreach ( wsp_platforms() as $key => $label ) : ?>
-				<h2><label for="wsp-template-<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></label></h2>
-				<textarea id="wsp-template-<?php echo esc_attr( $key ); ?>" name="templates[<?php echo esc_attr( $key ); ?>]" rows="5" class="large-text"><?php echo esc_textarea( wsp_template( $key ) ); ?></textarea>
-			<?php endforeach; ?>
+			<div class="wsp-template-grid">
+				<nav class="wsp-template-platforms" aria-label="<?php esc_attr_e( 'Platformlar', 'wp-social-publisher' ); ?>">
+					<h2><?php esc_html_e( 'Platform', 'wp-social-publisher' ); ?></h2>
+					<?php foreach ( $platforms as $key => $label ) : ?>
+						<button type="button" class="wsp-platform-tab<?php echo $key === $first_platform ? ' is-active' : ''; ?>" data-platform="<?php echo esc_attr( $key ); ?>" aria-pressed="<?php echo $key === $first_platform ? 'true' : 'false'; ?>"><?php echo esc_html( $label ); ?></button>
+					<?php endforeach; ?>
+				</nav>
+				<div class="wsp-template-fields">
+					<h2><?php esc_html_e( 'Şablon içeriği', 'wp-social-publisher' ); ?></h2>
+					<?php foreach ( $platforms as $key => $label ) : ?>
+						<?php $fields = wsp_template_fields( $key ); ?>
+						<section class="wsp-platform-fields" data-platform="<?php echo esc_attr( $key ); ?>" <?php echo $key === $first_platform ? '' : 'hidden'; ?>>
+							<h3><?php echo esc_html( $label ); ?></h3>
+							<p><label for="wsp-content-<?php echo esc_attr( $key ); ?>"><?php esc_html_e( 'İçerik', 'wp-social-publisher' ); ?></label>
+								<textarea id="wsp-content-<?php echo esc_attr( $key ); ?>" name="templates[<?php echo esc_attr( $key ); ?>][content]" rows="5" class="large-text wsp-template-input" data-field="content"><?php echo esc_textarea( $fields['content'] ); ?></textarea>
+							</p>
+							<p><label for="wsp-url-<?php echo esc_attr( $key ); ?>"><?php esc_html_e( 'URL', 'wp-social-publisher' ); ?></label>
+								<input id="wsp-url-<?php echo esc_attr( $key ); ?>" type="text" name="templates[<?php echo esc_attr( $key ); ?>][url]" value="<?php echo esc_attr( $fields['url'] ); ?>" class="large-text wsp-template-input" data-field="url">
+							</p>
+							<p><label for="wsp-tags-<?php echo esc_attr( $key ); ?>"><?php esc_html_e( 'Etiketler', 'wp-social-publisher' ); ?></label>
+								<input id="wsp-tags-<?php echo esc_attr( $key ); ?>" type="text" name="templates[<?php echo esc_attr( $key ); ?>][tags]" value="<?php echo esc_attr( $fields['tags'] ); ?>" class="large-text wsp-template-input" data-field="tags">
+							</p>
+							<details class="wsp-smart-tags">
+								<summary><?php esc_html_e( 'Akıllı etiketleri göster', 'wp-social-publisher' ); ?></summary>
+								<p><?php esc_html_e( 'Etiketi eklemek istediğiniz alana tıklayın; ekleme imlecin olduğu yere yapılır.', 'wp-social-publisher' ); ?></p>
+								<div class="wsp-smart-tag-buttons">
+									<?php foreach ( array( '{title}' => 'Başlık', '{excerpt}' => 'Özet', '{url}' => 'Yazı bağlantısı', '{tags}' => 'Yazı etiketleri', '{site_title}' => 'Site adı' ) as $tag => $tag_label ) : ?>
+										<button type="button" class="button button-secondary" data-smart-tag="<?php echo esc_attr( $tag ); ?>"><?php echo esc_html( $tag ); ?> <span class="screen-reader-text"><?php echo esc_html( $tag_label ); ?></span></button>
+									<?php endforeach; ?>
+								</div>
+							</details>
+						</section>
+					<?php endforeach; ?>
+				</div>
+				<aside class="wsp-template-preview" aria-live="polite">
+					<h2><?php esc_html_e( 'Önizleme', 'wp-social-publisher' ); ?></h2>
+					<p class="description"><?php esc_html_e( 'Örnek yazı bilgileriyle canlı önizleme.', 'wp-social-publisher' ); ?></p>
+					<div class="wsp-preview-card">
+						<div class="wsp-preview-image"><?php esc_html_e( 'Öne çıkan görsel', 'wp-social-publisher' ); ?></div>
+						<p class="wsp-preview-title"><?php esc_html_e( 'Örnek yazı başlığı', 'wp-social-publisher' ); ?></p>
+						<pre class="wsp-preview-text" aria-label="<?php esc_attr_e( 'Paylaşım metni önizlemesi', 'wp-social-publisher' ); ?>"></pre>
+					</div>
+					<p class="description"><?php esc_html_e( 'Şablon önizlemesi, gerçek yazıdaki başlık, özet, bağlantı ve etiketlerin yerini örnek verilerle gösterir.', 'wp-social-publisher' ); ?></p>
+				</aside>
+			</div>
 			<?php submit_button( __( 'Şablonları kaydet', 'wp-social-publisher' ) ); ?>
 		</form>
 	</div>
@@ -67,7 +120,13 @@ function wsp_save_templates(): void {
 	$submitted = isset( $_POST['templates'] ) && is_array( $_POST['templates'] ) ? wp_unslash( $_POST['templates'] ) : array();
 	$templates = array();
 	foreach ( wsp_platforms() as $key => $label ) {
-		$templates[ $key ] = isset( $submitted[ $key ] ) && is_string( $submitted[ $key ] ) ? sanitize_textarea_field( $submitted[ $key ] ) : '';
+		$platform_fields = isset( $submitted[ $key ] ) && is_array( $submitted[ $key ] ) ? $submitted[ $key ] : array();
+		$templates[ $key ] = array();
+		foreach ( array( 'content', 'url', 'tags' ) as $field ) {
+			$templates[ $key ][ $field ] = isset( $platform_fields[ $field ] ) && is_string( $platform_fields[ $field ] )
+				? sanitize_textarea_field( $platform_fields[ $field ] )
+				: '';
+		}
 	}
 	update_option( 'wsp_templates', $templates );
 	wp_safe_redirect( admin_url( 'admin.php?page=wsp-templates&updated=1' ) );
