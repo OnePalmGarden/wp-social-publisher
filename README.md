@@ -1,14 +1,14 @@
 # WP Social Publisher
 
-WordPress yazıları için Twitter / X, LinkedIn, Facebook, Medium ve Substack paylaşım taslakları hazırlayan eklenti.
+WordPress yazıları için Twitter / X, LinkedIn, Facebook, Instagram, Reddit ve Pinterest paylaşım taslakları hazırlayan eklenti.
 
 ## Bu sürümde
 
-Sürüm 0.7.0; X ve LinkedIn kullanıcı hesapları için resmi OAuth 2.0 giriş ve profil doğrulaması sunar, Facebook Sayfası bağlantısı önceki Sayfa erişim belirteci formuyla sürer. **Share Now**, Facebook ve LinkedIn'e tekil gönderi için görsel önizleme ve ayrı kullanıcı onayı ister. Önizlemede gösterilen öne çıkan görsel LinkedIn'e yüklenmez. **WP Auto Post** bir yazı, platform ve tarih seçerek planı takvime kaydeder; gönderimi otomatik yapmaz. Gerçek otomatik yayın için gönderim kuyruğu/çalıştırıcısı henüz yoktur. LinkedIn gönderileri, Share Now onayından sonra Posts API'ye `w_member_social` yetkisiyle gönderilir; hesap bağlantısı LinkedIn'deki **Share on LinkedIn** ürün iznini garanti etmez.
+Sürüm 0.8.0; X ve LinkedIn kullanıcı hesapları için resmi OAuth 2.0 giriş ve profil doğrulaması sunar, Facebook Sayfası bağlantısı önceki Sayfa erişim belirteci formuyla sürer. Instagram, Reddit ve Pinterest şablon/yazı planı seçenekleri olarak eklenmiştir; bu platformlara hesap bağlantısı veya gönderim API'si henüz yoktur. **Share Now**, Facebook ve LinkedIn'e tekil gönderi için görsel önizleme ve ayrı kullanıcı onayı ister. LinkedIn'de uygun öne çıkan JPEG/PNG görsel, onay sırasında LinkedIn Images API'ye yüklenir ve yazı paylaşımına eklenir. **WP Auto Post** bir yazı, platform ve tarih seçerek planı takvime kaydeder; gönderimi otomatik yapmaz. Gerçek otomatik yayın için gönderim kuyruğu/çalıştırıcısı henüz yoktur. LinkedIn gönderileri için uygulamada `w_member_social` kapsamı ve LinkedIn **Share on LinkedIn** ürün erişimi gerekir.
 
 **Calendar** planları ve Share Now gönderim sonuçlarını gerçekleştiği tarihte, platform ve durum etiketiyle gösterir. **Logs** en son 200 Share Now gönderim girişimini platform, yazı, sonuç ve platform gönderi kimliğiyle listeler; platform, durum ve site saat dilimindeki gün ile filtrelenebilir. Paylaşım metni ve erişim belirteçleri kayıtlara yazılmaz. Ağ hatalarında platform gönderimi almış olabilir; tekrar denemeden önce hedef hesabı kontrol edin.
 
-Medium ve Substack için şu an desteklenen resmi OAuth bağlantısı bulunmadığından eklenti parola istemez veya tarayıcı otomasyonu kullanmaz. İleride platformların desteklediği resmi bir yayınlama yöntemi sunulursa bu alan güncellenebilir.
+Instagram, Reddit ve Pinterest şu an yalnızca metabox, şablon ve planlama ekranlarında görünür; hesap bağlantısı ve gönderi yayınlama henüz desteklenmez. Resmi API erişimi eklenmeden bu platformlar paylaşım yapmaz. Eklenti parola toplamaz veya resmi olmayan tarayıcı otomasyonuyla giriş yapmaz.
 
 ## Kurulum ve güncelleme
 
@@ -31,11 +31,11 @@ Güncellemeden önce sitenizin yedeğini alın. Mevcut yazıların platform seç
 | `{tags}` | Yazı etiketleri; virgülle ayrılır, otomatik `#` eklenmez |
 | `{site_title}` | WordPress site adı |
 
-İçerik, URL ve etiket alanlarının boş olmayanları paylaşım metninde sırasıyla aralarında boş satır olacak şekilde birleştirilir. Şablon ekranındaki canlı önizleme örnek yazı verileri kullanır; gerçek yazıya ait önizleme yazı düzenleme ekranındaki taslak kutusunda görüntülenir.
+İçerik, URL ve etiket alanlarının boş olmayanları paylaşım metninde sırasıyla aralarında boş satır olacak şekilde birleştirilir. Şablon ekranı, öne çıkan görseli bulunan en son yayımlanmış yazının görselini örnek kartta gösterir; öne çıkan görsel yoksa görsel alanının boş olduğu belirtilir.
 
 Yazı kutusundaki yazıya özel metin, varsayılan şablonun tamamının yerine kullanılır. Özel metni boş bırakırsanız varsayılan şablon kullanılır. Özel metin de aynı yer tutucuları destekler.
 
-Yazının **öne çıkan görseli** eklenti tarafından Facebook'a ayrı olarak yüklenmez; Facebook, bağlantı önizlemesini kendi kurallarına göre oluşturabilir. Platform sırası Twitter / X, LinkedIn, Facebook, Medium ve Substack'tir. Önceki sürümdeki Instagram tercihi yeni sürüm arayüzünde gösterilmez; mevcut yazı verileri otomatik olarak silinmez.
+Yazının **öne çıkan görseli** LinkedIn gönderisine ayrı medya olarak yüklenir. Facebook, bağlantı önizlemesini kendi kurallarına göre oluşturabilir; Instagram, Reddit ve Pinterest için gönderi uç noktası henüz yoktur. Platform sırası Twitter / X, LinkedIn, Facebook, Instagram, Reddit ve Pinterest'tir. Eski Medium/Substack yazı meta verileri veritabanından silinmez; yeni arayüzde görünmez.
 
 ## X karakter sayacı
 
@@ -65,7 +65,7 @@ Eklenti `users.read`, `tweet.read`, `tweet.write` ve `offline.access` izinlerini
 4. **LinkedIn ile güvenli giriş** düğmesine basıp yetkilendirin. Dönüşte OpenID Connect kullanıcı profili doğrulanır.
 5. **Bağlantıyı test et** düğmesi hesabı yeniden kontrol eder. Gönderi paylaşmak için LinkedIn'in ayrı **Share on LinkedIn** ürün izni gerekir; erişim LinkedIn onayına bağlıdır.
 
-Bağlı hesaba deneme gönderisi için **Share Now** sayfasında LinkedIn'i ve yayımlanmış, şifresiz bir yazıyı seçin. Önizlemeyi inceleyin; gönderi ancak **Onayla ve LinkedIn'de paylaş** onayıyla yayımlanır. Yazı bağlantısı gönderi metnine eklenir. Başarı ve API hataları **Logs** sayfasına kaydedilir. LinkedIn uygulaması `w_member_social` iznine ve ürün erişimine sahip değilse LinkedIn isteği reddeder; bağlantı testi bu izni test etmez.
+Bağlı hesaba deneme gönderisi için **Share Now** sayfasında LinkedIn'i ve yayımlanmış, şifresiz bir yazıyı seçin. Önizlemede öne çıkan görsel görünmelidir; JPEG/PNG ve en fazla 10 MB olmalıdır. Görsel yoksa paylaşım metin ve bağlantı olarak gönderilir. Gönderi ancak **Onayla ve LinkedIn'de paylaş** onayıyla yayımlanır. Başarı ve API hataları **Logs** sayfasına kaydedilir. LinkedIn uygulamasında **Share on LinkedIn** ürün erişimi ve OAuth sırasında verilen `w_member_social` yetkisi zorunludur. Ürün veya kapsam sonradan açıldıysa hesabı yeniden bağlayıp yetkiyi yeniden verin. Logs'taki HTTP durum kodunu kontrol edin; 401/403 genellikle token, ürün erişimi veya izin eksikliğini gösterir. Bağlantı testi gönderi iznini veya API yayınlamasını test etmez.
 
 ### Facebook Sayfası
 

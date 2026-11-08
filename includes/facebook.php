@@ -240,7 +240,7 @@ function wsp_render_share_confirmation( string $id, array $draft ): void {
 				<h2><?php esc_html_e( 'Gönderiyi onayla', 'wp-social-publisher' ); ?></h2>
 				<p><strong><?php esc_html_e( 'Hedef:', 'wp-social-publisher' ); ?></strong> <?php echo esc_html( $draft['target'] ); ?></p>
 				<p><?php echo esc_html( sprintf( __( 'Onayladığınızda gönderi hemen %s hesabında yayımlanır.', 'wp-social-publisher' ), $platform_label ) ); ?></p>
-				<p class="description"><?php esc_html_e( 'Öne çıkan görsel bu ekranda önizlenir. LinkedIn gönderisine görsel yüklenmez; LinkedIn paylaşımında yazı bağlantısı metne eklenmiştir.', 'wp-social-publisher' ); ?></p>
+				<p class="description"><?php esc_html_e( 'LinkedIn paylaşımında öne çıkan JPEG/PNG görsel varsa onaydan sonra gönderiye yüklenir; metinde ayrıca yazı bağlantısı bulunur.', 'wp-social-publisher' ); ?></p>
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 					<input type="hidden" name="action" value="wsp_facebook_publish">
 					<input type="hidden" name="draft" value="<?php echo esc_attr( $id ); ?>">
@@ -301,7 +301,7 @@ function wsp_share_now_page(): void {
 				<aside class="wsp-panel wsp-share-help">
 					<h2><?php esc_html_e( 'Önizleme ve yayınlama', 'wp-social-publisher' ); ?></h2>
 					<p><?php esc_html_e( 'Bir sonraki ekranda hesap adı, paylaşım metni, yazı başlığı ve öne çıkan görselin önizlemesi gösterilir. Onay vermeden hiçbir gönderi yapılmaz.', 'wp-social-publisher' ); ?></p>
-					<p class="description"><?php esc_html_e( 'Görsel burada yalnızca önizlemedir. Bu sürüm LinkedIn gönderisine görsel dosyası yüklemez; Facebook bağlantı görselini kendi önizleme kurallarıyla oluşturabilir.', 'wp-social-publisher' ); ?></p>
+					<p class="description"><?php esc_html_e( 'LinkedIn onayında öne çıkan JPEG/PNG görsel ayrıca gönderiye yüklenir. Facebook bağlantı görselini kendi önizleme kurallarıyla oluşturabilir.', 'wp-social-publisher' ); ?></p>
 				</aside>
 			</div>
 		<?php endif; ?>
@@ -393,7 +393,13 @@ function wsp_facebook_publish(): void {
 	}
 	$result = 'facebook' === $platform
 		? wsp_facebook_request( $account['page_id'] . '/feed', $account['token'], 'POST', array( 'message' => $draft['message'], 'link' => $draft['link'] ) )
-		: wsp_linkedin_publish_post( $account['access_token'], (string) $draft['target_id'], $draft['message'] );
+		: wsp_linkedin_publish_post(
+			$account['access_token'],
+			(string) $draft['target_id'],
+			$draft['message'],
+			(int) get_post_thumbnail_id( $post ),
+			$draft['post_title']
+		);
 	if ( is_wp_error( $result ) ) {
 		$error_message = $result->get_error_message();
 		$status = str_contains( strtolower( $error_message ), 'belirsiz' ) ? 'Belirsiz' : 'Başarısız';

@@ -8,6 +8,7 @@ $GLOBALS['posts'] = array();
 $GLOBALS['enqueued'] = array();
 $GLOBALS['transients'] = array();
 define( 'MINUTE_IN_SECONDS', 60 );
+define( 'MB_IN_BYTES', 1024 * 1024 );
 
 class WP_Post {
 	public int $ID;
@@ -42,7 +43,11 @@ function wp_is_post_revision( $id ) { return false; }
 function wp_json_encode( $value ) { return json_encode( $value ); }
 function wp_salt( $scheme ) { return 'test-only-salt-' . $scheme; }
 function is_wp_error( $value ) { return $value instanceof WP_Error; }
-function wp_remote_request( $url, $args ) { $GLOBALS['request'] = array( $url, $args ); return $GLOBALS['response']; }
+function wp_remote_request( $url, $args ) {
+	$GLOBALS['request'] = array( $url, $args );
+	$GLOBALS['request_history'][] = $GLOBALS['request'];
+	return ! empty( $GLOBALS['response_queue'] ) ? array_shift( $GLOBALS['response_queue'] ) : $GLOBALS['response'];
+}
 function wp_remote_get( $url, $args ) { $GLOBALS['profile_request'] = array( $url, $args ); return $GLOBALS['profile_response']; }
 function wp_remote_post( $url, $args ) { $GLOBALS['token_request'] = array( $url, $args ); return $GLOBALS['token_response']; }
 function wp_remote_retrieve_body( $response ) { return $response['body']; }
@@ -75,6 +80,9 @@ function wp_timezone() { return new DateTimeZone( 'Europe/Istanbul' ); }
 function wp_timezone_string() { return 'Europe/Istanbul'; }
 function get_the_title( $post ) { return 'Deneme başlığı'; }
 function get_the_post_thumbnail_url( $post, $size ) { return 'https://example.test/featured.jpg'; }
+function get_post_thumbnail_id( $post ) { return 77; }
+function get_attached_file( $attachment_id ) { return $GLOBALS['attached_file'] ?? false; }
+function wp_check_filetype_and_ext( $file, $filename ) { return array( 'type' => str_ends_with( $filename, '.jpg' ) ? 'image/jpeg' : '' ); }
 function get_the_excerpt( $post ) { return '<p>Özet metni</p>'; }
 function wp_strip_all_tags( $value ) { return strip_tags( $value ); }
 function get_permalink( $post ) { return 'https://example.test/deneme/'; }
@@ -130,7 +138,7 @@ function expect( bool $condition, string $message ): void {
 }
 
 $post = new WP_Post( 12 );
-expect( array( 'x', 'linkedin', 'facebook', 'medium', 'substack' ) === array_keys( wsp_platforms() ), 'Platformlar istenen sırada olmalı; Instagram kaldırılmalı' );
+expect( array( 'x', 'linkedin', 'facebook', 'instagram', 'reddit', 'pinterest' ) === array_keys( wsp_platforms() ), 'Platform listesi yeni servisleri içermeli; Medium/Substack kaldırılmalı' );
 expect( 140 === wsp_x_character_count( str_repeat( 'a', 139 ) . '😀' ), 'Emoji bir Unicode karakteri sayılmalı' );
 expect( 141 === wsp_x_character_count( str_repeat( 'ğ', 140 ) . "\n" ), '140 üstü Unicode ve satır sonu sayılmalı' );
 expect( "{title}\n\n{excerpt}\n\n{url}\n\n{tags}" === wsp_template( 'facebook' ), 'Varsayılan şablon' );
@@ -177,7 +185,7 @@ wsp_render_share_metabox( $post );
 $html = ob_get_clean();
 expect( str_contains( $html, 'LinkedIn' ) && str_contains( $html, 'LinkedIn: Deneme başlığı' ), 'Yazı metninin önizlemesi' );
 expect( str_contains( $html, 'Eski özel metin' ), 'Önceki özel metin korunmalı' );
-expect( str_contains( $html, 'Twitter / X' ) && ! str_contains( $html, '>Instagram<' ), 'Yazı kutusu yeni platform listesini kullanmalı' );
+expect( str_contains( $html, 'Twitter / X' ) && str_contains( $html, 'Instagram' ) && str_contains( $html, 'Reddit' ) && str_contains( $html, 'Pinterest' ) && ! str_contains( $html, '>Medium<' ) && ! str_contains( $html, '>Substack<' ), 'Yazı kutusu yeni platform listesini kullanmalı' );
 expect( str_contains( $html, 'Tahmini karakter sayısı:' ) && str_contains( $html, 'wsp-x-preview' ), 'X karakter sayacı yazıda görünmeli' );
 
 $cipher = wsp_facebook_encrypt( 'secret-token' );
@@ -261,6 +269,7 @@ expect( null === $GLOBALS['request'], 'Tekrarlanan onay Meta isteği göndermeme
 expect( 'Başarılı' === get_option( 'wsp_delivery_logs' )[0]['status'] && '123_456' === get_option( 'wsp_delivery_logs' )[0]['remote_id'], 'Başarılı Facebook gönderimi Logs kaydına yazılmalı' );
 
 $_GET = array( 'page' => 'wsp-templates' );
+$GLOBALS['posts'] = array( $post );
 wsp_admin_assets( 'unused-hook-name' );
 expect( 2 === count( $GLOBALS['enqueued'] ), 'Şablon sayfası CSS ve JS eklemeli' );
 ob_start();
@@ -268,6 +277,7 @@ wsp_templates_page();
 $template_page = ob_get_clean();
 expect( str_contains( $template_page, 'Akıllı etiketleri göster' ) && str_contains( $template_page, 'data-smart-tag="{title}"' ), 'Akıllı etiketleri gösterip ekleyebilmeli' );
 expect( str_contains( $template_page, 'wsp-template-grid' ) && str_contains( $template_page, 'wsp-preview-text' ), 'Üç bölümlü düzen ve önizleme bulunmalı' );
+expect( str_contains( $template_page, 'wsp-preview-image' ) && str_contains( $template_page, 'featured.jpg' ), 'Şablon önizlemesi öne çıkan görseli göstermeli' );
 
 $_GET = array( 'page' => 'wsp-accounts' );
 $GLOBALS['enqueued'] = array();
@@ -288,12 +298,12 @@ foreach ( array( 'x', 'linkedin' ) as $platform ) {
 	expect( str_contains( $accounts_page, 'wsp_oauth_save_app' ) && ! str_contains( $accounts_page, 'wsp_facebook_connect' ), 'Platforma özel OAuth formu olmalı: ' . $platform );
 	expect( ! str_contains( $accounts_page, 'wsp_oauth_start' ), 'Uygulama bilgileri olmadan giriş başlamamalı: ' . $platform );
 }
-foreach ( array( 'medium', 'substack' ) as $platform ) {
+foreach ( array( 'instagram', 'reddit', 'pinterest' ) as $platform ) {
 	$_GET['platform'] = $platform;
 	ob_start();
 	wsp_accounts_page();
 	$accounts_page = ob_get_clean();
-	expect( str_contains( $accounts_page, wsp_platforms()[ $platform ] ) && str_contains( $accounts_page, 'Resmi hesap bağlantısı desteklenmiyor' ), 'Desteklenmeyen platform durumu gösterilmeli: ' . $platform );
+	expect( str_contains( $accounts_page, wsp_platforms()[ $platform ] ) && str_contains( $accounts_page, 'Resmi hesap bağlantısı desteklenmiyor' ), 'Yeni platform için bağlantı henüz desteklenmediği belirtilmeli: ' . $platform );
 	expect( ! str_contains( $accounts_page, 'page_token' ) && ! str_contains( $accounts_page, 'client_secret' ), 'Desteklenmeyen platform için kimlik bilgisi alınmamalı' );
 }
 $_GET['platform'] = 'gecersiz';
@@ -401,9 +411,17 @@ try {
 }
 expect( 'linkedin-client' === $GLOBALS['token_request'][1]['body']['client_id'] && 'linkedin-secret' === $GLOBALS['token_request'][1]['body']['client_secret'], 'LinkedIn token isteği uygulama bilgilerini kullanmalı' );
 expect( 'li-123' === get_option( 'wsp_oauth_accounts' )['linkedin']['profile']['id'], 'LinkedIn profili doğrulanıp kaydedilmeli' );
+$temporary_image = tempnam( sys_get_temp_dir(), 'wsp-image-' );
+$GLOBALS['attached_file'] = $temporary_image . '.jpg';
+rename( $temporary_image, $GLOBALS['attached_file'] );
+file_put_contents( $GLOBALS['attached_file'], 'test image bytes' );
 $GLOBALS['password_override'] = str_repeat( 'b', 32 );
 $_POST = array( 'platform' => 'linkedin', 'post_id' => '12' );
-$GLOBALS['response'] = array( 'code' => 201, 'body' => '', 'headers' => array( 'x-restli-id' => 'urn:li:share:789' ) );
+$GLOBALS['response_queue'] = array(
+	array( 'code' => 200, 'body' => '{"value":{"uploadUrl":"https://www.linkedin.com/dms-uploads/test-upload","image":"urn:li:image:test-image"}}' ),
+	array( 'code' => 201, 'body' => '' ),
+	array( 'code' => 201, 'body' => '', 'headers' => array( 'x-restli-id' => 'urn:li:share:789' ) ),
+);
 try {
 	wsp_facebook_preview();
 } catch ( RuntimeException $error ) {}
@@ -427,6 +445,12 @@ expect( 'https://api.linkedin.com/rest/posts' === $GLOBALS['request'][0], 'Linke
 expect( 'Bearer li-access' === $GLOBALS['request'][1]['headers']['Authorization'] && '202511' === $GLOBALS['request'][1]['headers']['LinkedIn-Version'], 'LinkedIn istek belirteci ve API sürümü başlıklarını kullanmalı' );
 $linkedin_payload = json_decode( $GLOBALS['request'][1]['body'], true );
 expect( 'urn:li:person:li-123' === $linkedin_payload['author'] && 'PUBLISHED' === $linkedin_payload['lifecycleState'], 'LinkedIn API yükü doğru yazarla yayınlanmalı' );
+expect( isset( $linkedin_payload['content']['media']['id'] ) && 'urn:li:image:test-image' === $linkedin_payload['content']['media']['id'], 'LinkedIn postu yüklenen öne çıkan görseli kullanmalı' );
+$linkedin_requests = array_slice( $GLOBALS['request_history'], -3 );
+$image_init = json_decode( $linkedin_requests[0][1]['body'], true );
+expect( 'https://api.linkedin.com/rest/images?action=initializeUpload' === $linkedin_requests[0][0] && 'urn:li:person:li-123' === $image_init['initializeUploadRequest']['owner'], 'LinkedIn görseli doğru yazarla resmi Images API üzerinden başlatılmalı' );
+expect( 'PUT' === $linkedin_requests[1][1]['method'] && 'image/jpeg' === $linkedin_requests[1][1]['headers']['Content-Type'] && 'test image bytes' === $linkedin_requests[1][1]['body'], 'LinkedIn görsel yüklemesi doğru HTTP metodu ve MIME ile yapılmalı' );
+expect( '202511' === $linkedin_requests[0][1]['headers']['LinkedIn-Version'] && '202511' === $linkedin_requests[2][1]['headers']['LinkedIn-Version'], 'LinkedIn Images ve Posts API istekleri aynı sürümü kullanmalı' );
 expect( 'Başarılı' === get_option( 'wsp_delivery_logs' )[0]['status'] && 'urn:li:share:789' === get_option( 'wsp_delivery_logs' )[0]['remote_id'], 'Başarılı LinkedIn gönderimi Logs kaydına yazılmalı' );
 expect( ! str_contains( json_encode( get_option( 'wsp_delivery_logs' ) ), 'li-access' ), 'Logs kayıtları erişim belirteci içermemeli' );
 $_GET = array(
@@ -463,6 +487,8 @@ try {
 	expect( str_starts_with( $error->getMessage(), 'redirect:' ), 'LinkedIn API hatası kullanıcıya bildirilmeli' );
 }
 expect( 'Başarısız' === get_option( 'wsp_delivery_logs' )[0]['status'] && ! str_contains( json_encode( get_option( 'wsp_delivery_logs' )[0] ), 'li-access' ), 'LinkedIn hatası belirteç sızdırmadan Logs içine yazılmalı' );
+expect( str_contains( get_option( 'wsp_delivery_logs' )[0]['message'], 'HTTP 403' ), 'LinkedIn API hata yanıtının HTTP durumu Logs kaydına eklenmeli' );
+unlink( $GLOBALS['attached_file'] );
 $_POST = array( 'platform' => 'linkedin' );
 $GLOBALS['profile_response'] = array( 'code' => 200, 'body' => '{"sub":"li-123","name":"LinkedIn Tester"}' );
 try {

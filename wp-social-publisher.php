@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Social Publisher
  * Description: Yazılar için platform bazlı sosyal paylaşım metinleri ve planlama taslağı.
- * Version: 0.7.0
+ * Version: 0.8.0
  * Requires at least: 6.2
  * Requires PHP: 8.0
  * Author: OnePalmGarden
@@ -20,11 +20,12 @@ require_once __DIR__ . '/includes/oauth-accounts.php';
 
 function wsp_platforms(): array {
 	return array(
-		'x'        => 'Twitter / X',
-		'linkedin' => 'LinkedIn',
-		'facebook' => 'Facebook',
-		'medium'   => 'Medium',
-		'substack' => 'Substack',
+		'x'         => 'Twitter / X',
+		'linkedin'  => 'LinkedIn',
+		'facebook'  => 'Facebook',
+		'instagram' => 'Instagram',
+		'reddit'    => 'Reddit',
+		'pinterest' => 'Pinterest',
 	);
 }
 
@@ -130,7 +131,7 @@ function wsp_render_share_metabox( WP_Post $post ): void {
 	wp_nonce_field( 'wsp_save_share_settings', 'wsp_share_nonce' );
 	?>
 	<p><?php esc_html_e( 'Platformları seçin. Yazıya özel metni boş bırakırsanız o platformun varsayılan şablonu kullanılır. Alanlarda {title}, {excerpt}, {url} ve {tags} kullanabilirsiniz.', 'wp-social-publisher' ); ?></p>
-	<p><?php esc_html_e( 'Önizleme en son kaydedilen yazı bilgilerine dayanır. Öne çıkan görsel, ileride gönderim için kullanılacak görsel kaynağıdır; bu sürümde görsel gönderilmez.', 'wp-social-publisher' ); ?></p>
+	<p><?php esc_html_e( 'Önizleme en son kaydedilen yazı bilgilerine dayanır. Öne çıkan görsel gönderi metninden ayrı bir medya öğesidir; görsel desteği platform bağlantısına göre değişir.', 'wp-social-publisher' ); ?></p>
 	<div class="wsp-platform-list">
 		<?php foreach ( $platforms as $key => $label ) : ?>
 			<?php

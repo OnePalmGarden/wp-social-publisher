@@ -25,7 +25,7 @@ function wsp_admin_assets( string $hook_suffix ): void {
 		return;
 	}
 	$base_url = plugin_dir_url( dirname( __DIR__ ) . '/wp-social-publisher.php' );
-	wp_enqueue_style( 'wsp-templates', $base_url . 'assets/templates.css', array(), '0.7.0' );
+	wp_enqueue_style( 'wsp-templates', $base_url . 'assets/templates.css', array(), '0.8.0' );
 	if ( 'wsp-templates' === $page ) {
 		wp_enqueue_script( 'wsp-templates', $base_url . 'assets/templates.js', array(), '0.3.0', true );
 	}
@@ -154,7 +154,7 @@ function wsp_templates_page(): void {
 		<h1><?php esc_html_e( 'Templates / Paylaşım şablonları', 'wp-social-publisher' ); ?></h1>
 		<?php wsp_notice(); ?>
 		<p><?php esc_html_e( 'Soldan platformu seçin, orta bölümdeki alanları düzenleyin ve sağdaki önizlemede sonucu görün. Yazı düzenleyicisindeki özel metin, varsayılan şablonun yerine kullanılır.', 'wp-social-publisher' ); ?></p>
-		<p><?php esc_html_e( 'Başlık, özet, bağlantı ve yazı etiketleri seçtiğiniz platforma gönderim aşamasında yazıdan alınacak şekilde yer tutucularla gösterilir. Şablona emoji, ek açıklama veya kendi etiketlerinizi normal metin olarak ekleyebilirsiniz. Görsel kaynağı öne çıkan görseldir; bu deneme sürümü görsel göndermez.', 'wp-social-publisher' ); ?></p>
+		<p><?php esc_html_e( 'Başlık, özet, bağlantı ve yazı etiketleri şablon metnine yer tutucularla eklenir. Öne çıkan görsel şablon metnine değil, gönderinin medya kartına eklenir. LinkedIn gönderisinde görsel yüklemesi desteklenir; diğer platformlar için hesap bağlantısı ve medya gönderimi ayrıca gereklidir.', 'wp-social-publisher' ); ?></p>
 		<?php if ( isset( $_GET['updated'] ) && '1' === $_GET['updated'] ) : ?>
 			<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Şablonlar kaydedildi.', 'wp-social-publisher' ); ?></p></div>
 		<?php endif; ?>
@@ -195,12 +195,21 @@ function wsp_templates_page(): void {
 						</section>
 					<?php endforeach; ?>
 				</div>
+				<?php
+				$preview_query = new WP_Query( array( 'post_type' => 'post', 'post_status' => 'publish', 'posts_per_page' => 1, 'meta_key' => '_thumbnail_id' ) );
+				$preview_post = $preview_query->posts ? $preview_query->posts[0] : null;
+				$preview_image = $preview_post ? get_the_post_thumbnail_url( $preview_post, 'large' ) : false;
+				?>
 				<aside class="wsp-template-preview" aria-live="polite">
 					<h2><?php esc_html_e( 'Önizleme', 'wp-social-publisher' ); ?></h2>
-					<p class="description"><?php esc_html_e( 'Örnek yazı bilgileriyle canlı önizleme.', 'wp-social-publisher' ); ?></p>
+					<p class="description"><?php esc_html_e( 'Öne çıkan görsel ve örnek yazı bilgileriyle şablon önizlemesi.', 'wp-social-publisher' ); ?></p>
 					<div class="wsp-preview-card">
-						<div class="wsp-preview-image"><?php esc_html_e( 'Öne çıkan görsel', 'wp-social-publisher' ); ?></div>
-						<p class="wsp-preview-title"><?php esc_html_e( 'Örnek yazı başlığı', 'wp-social-publisher' ); ?></p>
+						<?php if ( is_string( $preview_image ) && '' !== $preview_image ) : ?>
+							<img class="wsp-preview-image" src="<?php echo esc_url( $preview_image ); ?>" alt="<?php echo esc_attr( get_the_title( $preview_post ) ); ?>">
+						<?php else : ?>
+							<div class="wsp-preview-image"><?php esc_html_e( 'Öne çıkan görsel eklenmemiş', 'wp-social-publisher' ); ?></div>
+						<?php endif; ?>
+						<p class="wsp-preview-title"><?php echo esc_html( $preview_post ? get_the_title( $preview_post ) : __( 'Örnek yazı başlığı', 'wp-social-publisher' ) ); ?></p>
 						<pre class="wsp-preview-text" aria-label="<?php esc_attr_e( 'Paylaşım metni önizlemesi', 'wp-social-publisher' ); ?>"></pre>
 					</div>
 					<p class="description"><?php esc_html_e( 'Şablon önizlemesi, gerçek yazıdaki başlık, özet, bağlantı ve etiketlerin yerini örnek verilerle gösterir.', 'wp-social-publisher' ); ?></p>

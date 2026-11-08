@@ -112,6 +112,13 @@
 	text-align: center;
 }
 
+.wsp-preview-image[src] {
+	display: block;
+	width: 100%;
+	max-height: 320px;
+	object-fit: cover;
+}
+
 .wsp-preview-title {
 	margin: 12px 14px 0;
 	font-weight: 600;

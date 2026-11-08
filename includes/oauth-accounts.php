@@ -100,11 +100,103 @@ function wsp_oauth_account( string $platform ) {
 	return $account;
 }
 
-function wsp_linkedin_publish_post( string $access_token, string $person_id, string $commentary ) {
+function wsp_linkedin_api_error_detail( $response, string $access_token ): string {
+	if ( is_wp_error( $response ) ) {
+		return '';
+	}
+	$status = wp_remote_retrieve_response_code( $response );
+	$data = json_decode( wp_remote_retrieve_body( $response ), true );
+	$message = is_array( $data ) && isset( $data['message'] ) && is_string( $data['message'] ) ? sanitize_text_field( $data['message'] ) : '';
+	if ( '' !== $access_token ) {
+		$message = str_replace( $access_token, '[gizlendi]', $message );
+	}
+	return ' HTTP ' . (int) $status . ( '' !== $message ? ': ' . $message : '' );
+}
+
+function wsp_linkedin_upload_featured_image( string $access_token, string $person_id, int $attachment_id ) {
+	$file = get_attached_file( $attachment_id );
+	if ( ! is_string( $file ) || ! is_readable( $file ) ) {
+		return new WP_Error( 'linkedin_image_missing', 'Yazının öne çıkan görsel dosyası okunamıyor.' );
+	}
+	$file_size = filesize( $file );
+	$file_type = wp_check_filetype_and_ext( $file, basename( $file ) );
+	$mime_type = isset( $file_type['type'] ) && is_string( $file_type['type'] ) ? $file_type['type'] : '';
+	if ( false === $file_size || 0 >= $file_size || 10 * MB_IN_BYTES < $file_size || ! in_array( $mime_type, array( 'image/jpeg', 'image/png' ), true ) ) {
+		return new WP_Error( 'linkedin_image_invalid', 'LinkedIn için öne çıkan görsel JPEG veya PNG olmalı ve 10 MB sınırını aşmamalı.' );
+	}
+	$image = file_get_contents( $file );
+	if ( ! is_string( $image ) ) {
+		return new WP_Error( 'linkedin_image_read', 'Öne çıkan görsel okunamadı.' );
+	}
+	$init_body = wp_json_encode( array( 'initializeUploadRequest' => array( 'owner' => 'urn:li:person:' . $person_id ) ) );
+	if ( ! is_string( $init_body ) ) {
+		return new WP_Error( 'linkedin_image_init', 'LinkedIn görsel yükleme isteği hazırlanamadı.' );
+	}
+	$init_response = wp_remote_request(
+		'https://api.linkedin.com/rest/images?action=initializeUpload',
+		array(
+			'method'      => 'POST',
+			'timeout'     => 30,
+			'redirection' => 0,
+			'headers'     => array(
+				'Authorization'             => 'Bearer ' . $access_token,
+				'Accept'                    => 'application/json',
+				'Content-Type'              => 'application/json',
+				'LinkedIn-Version'          => '202511',
+				'X-Restli-Protocol-Version' => '2.0.0',
+			),
+			'body'        => $init_body,
+		)
+	);
+	if ( is_wp_error( $init_response ) || 200 !== wp_remote_retrieve_response_code( $init_response ) ) {
+		return new WP_Error( 'linkedin_image_init_failed', 'LinkedIn görsel yüklemesini başlatamadı.' . wsp_linkedin_api_error_detail( $init_response, $access_token ) . ' Görsel izni ve Share on LinkedIn ürün erişimini kontrol edin.' );
+	}
+	$init_data = json_decode( wp_remote_retrieve_body( $init_response ), true );
+	$upload_url = $init_data['value']['uploadUrl'] ?? '';
+	$image_urn = $init_data['value']['image'] ?? '';
+	$upload_host = is_string( $upload_url ) ? wp_parse_url( $upload_url, PHP_URL_HOST ) : false;
+	if ( ! is_string( $upload_url ) || ! wp_http_validate_url( $upload_url ) || 'https' !== wp_parse_url( $upload_url, PHP_URL_SCHEME ) || ! is_string( $upload_host ) || ( 'linkedin.com' !== $upload_host && ! str_ends_with( $upload_host, '.linkedin.com' ) ) || ! is_string( $image_urn ) || ! str_starts_with( $image_urn, 'urn:li:image:' ) ) {
+		return new WP_Error( 'linkedin_image_init_invalid', 'LinkedIn geçerli bir görsel yükleme adresi döndürmedi.' );
+	}
+	$upload_response = wp_remote_request(
+		$upload_url,
+		array(
+			'method'      => 'PUT',
+			'timeout'     => 60,
+			'redirection' => 0,
+			'headers'     => array(
+				'Authorization' => 'Bearer ' . $access_token,
+				'Content-Type'  => $mime_type,
+			),
+			'body'        => $image,
+		)
+	);
+	if ( is_wp_error( $upload_response ) || 200 > wp_remote_retrieve_response_code( $upload_response ) || 300 <= wp_remote_retrieve_response_code( $upload_response ) ) {
+		return new WP_Error( 'linkedin_image_upload_failed', 'LinkedIn görseli yüklenemedi.' . wsp_linkedin_api_error_detail( $upload_response, $access_token ) . ' Sonucu kontrol edin ve görsel izinlerini doğrulayın.' );
+	}
+	return $image_urn;
+}
+
+function wsp_linkedin_publish_post( string $access_token, string $person_id, string $commentary, int $attachment_id = 0, string $image_alt = '' ) {
 	if ( '' === $access_token || ! preg_match( '/^[A-Za-z0-9._:-]{1,200}$/', $person_id ) || '' === trim( $commentary ) ) {
 		return new WP_Error( 'linkedin_invalid_post', 'LinkedIn gönderi bilgileri geçersiz.' );
 	}
-	$body = wp_json_encode(
+	$content = array();
+	if ( 0 < $attachment_id ) {
+		$image_urn = wsp_linkedin_upload_featured_image( $access_token, $person_id, $attachment_id );
+		if ( is_wp_error( $image_urn ) ) {
+			return $image_urn;
+		}
+		$content = array(
+			'content' => array(
+				'media' => array(
+					'title' => sanitize_text_field( $image_alt ),
+					'id'    => $image_urn,
+				),
+			),
+		);
+	}
+	$body = wp_json_encode( array_merge(
 		array(
 			'author'                   => 'urn:li:person:' . $person_id,
 			'commentary'               => $commentary,
@@ -116,8 +208,9 @@ function wsp_linkedin_publish_post( string $access_token, string $person_id, str
 			),
 			'lifecycleState'           => 'PUBLISHED',
 			'isReshareDisabledByAuthor' => false,
-		)
-	);
+		),
+		$content
+	) );
 	if ( ! is_string( $body ) ) {
 		return new WP_Error( 'linkedin_invalid_post', 'Gönderi metni LinkedIn için kodlanamadı.' );
 	}
@@ -143,7 +236,7 @@ function wsp_linkedin_publish_post( string $access_token, string $person_id, str
 	$status = wp_remote_retrieve_response_code( $response );
 	$data = json_decode( wp_remote_retrieve_body( $response ), true );
 	if ( 201 !== $status ) {
-		return new WP_Error( 'linkedin_publish_failed', 'LinkedIn gönderiyi kabul etmedi (HTTP ' . (int) $status . '). Share on LinkedIn ürün iznini, w_member_social kapsamını ve uygulama erişimini kontrol edin. Tekrar denemeden önce hesabınızı kontrol edin.' );
+		return new WP_Error( 'linkedin_publish_failed', 'LinkedIn gönderiyi kabul etmedi.' . wsp_linkedin_api_error_detail( $response, $access_token ) . ' Share on LinkedIn ürün iznini, w_member_social kapsamını ve uygulama erişimini kontrol edin. Tekrar denemeden önce hesabınızı kontrol edin.' );
 	}
 	$remote_id = wp_remote_retrieve_header( $response, 'x-restli-id' );
 	if ( ! is_string( $remote_id ) || '' === $remote_id ) {
@@ -281,10 +374,10 @@ function wsp_render_accounts_page(): void {
 					<?php endif; ?>
 				<?php elseif ( isset( $oauth_platforms[ $platform ] ) ) : ?>
 					<?php wsp_render_oauth_account( $platform, $oauth_platforms[ $platform ], $apps, $oauth_accounts ); ?>
-				<?php elseif ( in_array( $platform, array( 'medium', 'substack' ), true ) ) : ?>
+				<?php elseif ( in_array( $platform, array( 'instagram', 'reddit', 'pinterest' ), true ) ) : ?>
 					<h2 id="wsp-account-heading"><?php echo esc_html( $platforms[ $platform ] ); ?></h2>
 					<p><strong><?php esc_html_e( 'Resmi hesap bağlantısı desteklenmiyor', 'wp-social-publisher' ); ?></strong></p>
-					<p><?php esc_html_e( 'Bu eklenti parola toplamaz ve resmi olmayan tarayıcı otomasyonuyla giriş yapmaz. Platform tarafından desteklenen resmi bir OAuth/API yayınlama yöntemi sunulursa bu alan güncellenebilir.', 'wp-social-publisher' ); ?></p>
+					<p><?php esc_html_e( 'Bu platform şu anda şablon ve plan seçimi içindir; resmi hesap bağlantısı ve gönderi API desteği henüz eklenmedi. Bu eklenti parola toplamaz ve resmi olmayan tarayıcı otomasyonuyla giriş yapmaz.', 'wp-social-publisher' ); ?></p>
 				<?php endif; ?>
 			</section>
 		</div>
