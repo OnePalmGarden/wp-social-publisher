@@ -462,8 +462,8 @@ function wsp_render_accounts_page(): void {
 						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" autocomplete="off">
 							<input type="hidden" name="action" value="wsp_facebook_connect">
 							<?php wp_nonce_field( 'wsp_facebook_connect' ); ?>
-							<p><label for="wsp-page-id"><?php esc_html_e( 'Facebook Sayfa kimliği', 'wp-social-publisher' ); ?></label><br><input id="wsp-page-id" name="page_id" class="regular-text" inputmode="numeric" pattern="[0-9]+" required></p>
-							<p><label for="wsp-page-token"><?php esc_html_e( 'Sayfa erişim belirteci', 'wp-social-publisher' ); ?></label><br><input id="wsp-page-token" name="page_token" type="password" class="regular-text" autocomplete="new-password" required></p>
+							<p><label for="wsp-page-id"><?php esc_html_e( 'Facebook Sayfa kimliği', 'wp-social-publisher' ); ?></label><br><input id="wsp-page-id" name="page_id" type="text" class="regular-text wsp-facebook-field" inputmode="numeric" pattern="[0-9]+" required></p>
+							<p><label for="wsp-page-token"><?php esc_html_e( 'Sayfa erişim belirteci', 'wp-social-publisher' ); ?></label><br><input id="wsp-page-token" name="page_token" type="password" class="regular-text wsp-facebook-field" autocomplete="new-password" required></p>
 							<?php submit_button( __( 'Sayfayı doğrula ve bağla', 'wp-social-publisher' ) ); ?>
 						</form>
 					<?php endif; ?>

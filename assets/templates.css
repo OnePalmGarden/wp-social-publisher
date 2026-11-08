@@ -289,6 +289,37 @@
 	line-height: 1.35;
 }
 
+.wsp-event-actions {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	width: 100%;
+}
+
+.wsp-event-actions > a,
+.wsp-event-actions > form {
+	flex: 1 1 0;
+	min-width: 0;
+	margin: 0;
+	text-align: center;
+	white-space: nowrap;
+}
+
+.wsp-event-actions > a,
+.wsp-event-actions > form > button {
+	width: 100%;
+	padding: 2px 3px;
+	font-size: 11px;
+	white-space: nowrap;
+}
+
+.wsp-facebook-field {
+	box-sizing: border-box;
+	width: 25em;
+	max-width: 100%;
+}
+
 .wsp-event-success {
 	border-left-color: #00a32a;
 	background: #edfaef;

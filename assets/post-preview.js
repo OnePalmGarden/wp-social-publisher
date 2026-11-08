@@ -10,6 +10,7 @@
 		const fields = Array.from(box.querySelectorAll('.wsp-x-field'));
 		const preview = box.querySelector('.wsp-post-preview-text');
 		const counter = box.querySelector('.wsp-x-count');
+		const limit = Number.parseInt(box.dataset.limit, 10) || 200;
 		let values;
 		try {
 			values = JSON.parse(box.dataset.values);
@@ -37,9 +38,9 @@
 			}
 			const count = Array.from(text).length;
 			preview.textContent = text;
-			counter.textContent = 'Tahmini karakter sayısı: ' + count + ' / 140' +
-				(count > 140 ? ' — 140 karakterlik hedef aşıldı.' : '');
-			counter.style.color = count > 140 ? '#b32d2e' : '';
+			counter.textContent = 'Tahmini karakter sayısı: ' + count + ' / ' + limit +
+				(count > limit ? ' — ' + limit + ' karakterlik hedef aşıldı.' : '');
+			counter.style.color = count > limit ? '#b32d2e' : '';
 		}
 		input.addEventListener('input', update);
 		fields.forEach(function (field) { field.addEventListener('input', update); });

@@ -262,7 +262,7 @@ function wsp_render_share_confirmation( string $id, array $draft ): void {
 					} elseif ( 'linkedin' === $platform ) {
 						esc_html_e( 'LinkedIn paylaşımında öne çıkan JPEG/PNG görsel varsa onaydan sonra gönderiye yüklenir; metinde ayrıca yazı bağlantısı bulunur.', 'wp-social-publisher' );
 					} elseif ( 'x' === $platform ) {
-						esc_html_e( 'X gönderisine bağlantı eklenir; yazı ve bağlantının toplamı 140 karakterlik hedefi aşarsa gönderim yapılmaz.', 'wp-social-publisher' );
+						esc_html_e( 'X gönderisine bağlantı eklenir; toplam 200 karakterlik hedef aşılırsa gönderim yapılmaz.', 'wp-social-publisher' );
 					} else {
 						esc_html_e( 'Facebook bağlantı görselini kendi önizleme kurallarıyla oluşturabilir.', 'wp-social-publisher' );
 					}

@@ -177,8 +177,8 @@ function wsp_publish_platform_post( string $platform, WP_Post $post, string $mes
 	}
 	if ( 'x' === $platform ) {
 		$x_message = wsp_x_complete_message( $post, $message, $link );
-		if ( wsp_x_character_count( $x_message ) > 140 ) {
-			return new WP_Error( 'x_character_limit', 'X gönderisi bağlantıyla birlikte 140 karakterlik hedefi aşıyor; metni kısaltın.' );
+		if ( wsp_x_character_count( $x_message ) > wsp_x_character_limit() ) {
+			return new WP_Error( 'x_character_limit', 'X gönderisi 200 karakterlik hedefi aşıyor; metni kısaltın.' );
 		}
 		return wsp_publish_x_post( $account['access_token'], $x_message );
 	}

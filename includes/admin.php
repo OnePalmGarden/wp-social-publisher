@@ -37,7 +37,7 @@ function wsp_admin_assets( string $hook_suffix ): void {
 		return;
 	}
 	$base_url = plugin_dir_url( dirname( __DIR__ ) . '/wp-social-publisher.php' );
-	wp_enqueue_style( 'wsp-templates', $base_url . 'assets/templates.css', array(), '0.9.1' );
+	wp_enqueue_style( 'wsp-templates', $base_url . 'assets/templates.css', array(), '0.9.4' );
 	if ( 'wsp-templates' === $page ) {
 		wp_enqueue_script( 'wsp-templates', $base_url . 'assets/templates.js', array(), '0.9.1', true );
 	}
@@ -672,15 +672,17 @@ function wsp_calendar_page(): void {
 									<a class="wsp-event-title" href="<?php echo esc_url( get_edit_post_link( $event['post_id'] ) ); ?>"><?php echo esc_html( $event['title'] ); ?></a>
 								<?php else : ?><span class="wsp-event-title"><?php echo esc_html( $event['title'] ); ?></span><?php endif; ?>
 								<?php if ( 'plan' === $event['type'] && $event['editable'] && current_user_can( 'edit_post', $event['post_id'] ) ) : ?>
-									<a class="button button-small" href="<?php echo esc_url( get_edit_post_link( $event['post_id'] ) ); ?>"><?php esc_html_e( 'Planı düzenle', 'wp-social-publisher' ); ?></a>
-									<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Bu platformu plandan çıkarmak istiyor musunuz?');">
-										<input type="hidden" name="action" value="wsp_remove_scheduled_platform">
-										<input type="hidden" name="post_id" value="<?php echo esc_attr( (string) $event['post_id'] ); ?>">
-										<input type="hidden" name="platform" value="<?php echo esc_attr( $event['platform'] ); ?>">
-										<input type="hidden" name="scheduled_at" value="<?php echo esc_attr( $event['scheduled'] ); ?>">
-										<?php wp_nonce_field( 'wsp_remove_scheduled_platform' ); ?>
-										<button type="submit" class="button button-small"><?php esc_html_e( 'Plandan sil', 'wp-social-publisher' ); ?></button>
-									</form>
+									<div class="wsp-event-actions">
+										<a class="button button-small" href="<?php echo esc_url( get_edit_post_link( $event['post_id'] ) ); ?>" title="<?php esc_attr_e( 'Planı düzenle', 'wp-social-publisher' ); ?>"><?php esc_html_e( 'Düzenle', 'wp-social-publisher' ); ?></a>
+										<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Bu platformu plandan çıkarmak istiyor musunuz?');">
+											<input type="hidden" name="action" value="wsp_remove_scheduled_platform">
+											<input type="hidden" name="post_id" value="<?php echo esc_attr( (string) $event['post_id'] ); ?>">
+											<input type="hidden" name="platform" value="<?php echo esc_attr( $event['platform'] ); ?>">
+											<input type="hidden" name="scheduled_at" value="<?php echo esc_attr( $event['scheduled'] ); ?>">
+											<?php wp_nonce_field( 'wsp_remove_scheduled_platform' ); ?>
+											<button type="submit" class="button button-small" title="<?php esc_attr_e( 'Bu platformu plandan sil', 'wp-social-publisher' ); ?>"><?php esc_html_e( 'Sil', 'wp-social-publisher' ); ?></button>
+										</form>
+									</div>
 								<?php endif; ?>
 							</div>
 						<?php endforeach; ?>

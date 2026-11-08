@@ -157,6 +157,7 @@ $post = new WP_Post( 12 );
 expect( array( 'x', 'linkedin', 'facebook', 'instagram', 'reddit', 'pinterest' ) === array_keys( wsp_platforms() ), 'Platform listesi yeni servisleri içermeli; Medium/Substack kaldırılmalı' );
 expect( 140 === wsp_x_character_count( str_repeat( 'a', 139 ) . '😀' ), 'Emoji bir Unicode karakteri sayılmalı' );
 expect( 141 === wsp_x_character_count( str_repeat( 'ğ', 140 ) . "\n" ), '140 üstü Unicode ve satır sonu sayılmalı' );
+expect( 200 === wsp_x_character_limit(), 'X özel yayın hedefi 200 karakter olmalı' );
 expect( "{title}\n\n{excerpt}\n\n{url}\n\n{tags}" === wsp_template( 'facebook' ), 'Varsayılan şablon' );
 $GLOBALS['options']['wsp_templates'] = array( 'facebook' => 'Özel: {title}' );
 expect( 'Özel: {title}' === wsp_template( 'facebook' ), 'Kaydedilmiş şablon' );
@@ -344,6 +345,7 @@ wsp_accounts_page();
 $accounts_page = ob_get_clean();
 expect( str_contains( $accounts_page, 'wsp-accounts-grid' ) && str_contains( $accounts_page, 'wsp_facebook_connect' ) && str_contains( $accounts_page, 'wsp_facebook_disconnect' ), 'Facebook bağlantı ve kaldırma formları korunmalı' );
 expect( str_contains( $accounts_page, 'Kayıtlı Sayfa: Sayfa' ) && ! str_contains( $accounts_page, 'secret-token' ), 'Hesap bilgisi belirteç gösterilmeden sunulmalı' );
+expect( substr_count( $accounts_page, 'class="regular-text wsp-facebook-field"' ) === 2, 'Facebook kimlik ve erişim alanı ortak stil kullanmalı' );
 expect( str_contains( $accounts_page, 'güncel durumu burada kontrol edilmez' ), 'Bağlantı durumu güncel olarak sunulmamalı' );
 foreach ( array( 'x', 'linkedin', 'instagram', 'reddit', 'pinterest' ) as $platform ) {
 	$_GET['platform'] = $platform;
@@ -459,10 +461,10 @@ expect( 'refresh_token' === $GLOBALS['token_request'][1]['body']['grant_type'] &
 expect( 'x-refreshed' === $refreshed_account['access_token'] && 'x-refresh-2' === $refreshed_account['refresh_token'], 'Yenilenen X tokenları döndürülmeli ve saklanmalı' );
 update_post_meta( 12, '_wsp_x_fields_enabled', '1' );
 $GLOBALS['response'] = array( 'code' => 201, 'body' => '{"data":{"id":"tweet-123"}}' );
-$x_result = wsp_publish_platform_post( 'x', $post, str_repeat( 'a', 140 ), get_permalink( $post ) );
-expect( ! is_wp_error( $x_result ) && str_repeat( 'a', 140 ) === json_decode( $GLOBALS['request'][1]['body'], true )['text'], '140 karakterlik özel X metni değiştirilmeden gönderilmeli' );
+$x_result = wsp_publish_platform_post( 'x', $post, str_repeat( 'a', 200 ), get_permalink( $post ) );
+expect( ! is_wp_error( $x_result ) && str_repeat( 'a', 200 ) === json_decode( $GLOBALS['request'][1]['body'], true )['text'], '200 karakterlik özel X metni değiştirilmeden gönderilmeli' );
 $before_request = count( $GLOBALS['request_history'] );
-expect( is_wp_error( wsp_publish_platform_post( 'x', $post, str_repeat( 'a', 141 ), get_permalink( $post ) ) ) && $before_request === count( $GLOBALS['request_history'] ), '141 karakterli X metni API isteği yapılmadan reddedilmeli' );
+expect( is_wp_error( wsp_publish_platform_post( 'x', $post, str_repeat( 'a', 201 ), get_permalink( $post ) ) ) && $before_request === count( $GLOBALS['request_history'] ), '201 karakterli X metni API isteği yapılmadan reddedilmeli' );
 update_post_meta( 12, '_wsp_x_fields_enabled', '0' );
 
 $GLOBALS['profile_response'] = array( 'code' => 200, 'body' => '{"sub":"li-123","name":"LinkedIn Tester"}' );
@@ -645,7 +647,8 @@ $_GET = array( 'month' => '2026-11' );
 ob_start();
 wsp_calendar_page();
 $plan_calendar = ob_get_clean();
-expect( str_contains( $plan_calendar, 'Planı düzenle' ) && str_contains( $plan_calendar, 'wsp_remove_scheduled_platform' ) && str_contains( $plan_calendar, 'Plandan sil' ), 'Gelecek planlarda düzenleme ve platform silme düğmeleri görünmeli' );
+expect( str_contains( $plan_calendar, 'Düzenle' ) && str_contains( $plan_calendar, 'wsp_remove_scheduled_platform' ) && str_contains( $plan_calendar, '>Sil</button>' ), 'Gelecek planlarda düzenleme ve platform silme düğmeleri görünmeli' );
+expect( str_contains( $plan_calendar, 'class="wsp-event-actions"' ), 'Takvim planı düğmeleri aynı hizalama satırında olmalı' );
 $_POST = array( 'post_id' => '12', 'platform' => 'linkedin', 'scheduled_at' => '2026-11-20T14:45' );
 $GLOBALS['nonce_valid'] = false;
 try { wsp_remove_scheduled_platform(); } catch ( RuntimeException $error ) {}

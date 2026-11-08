@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Social Publisher
  * Description: Yazılar için platform bazlı sosyal paylaşım metinleri ve planlama taslağı.
- * Version: 0.9.2
+ * Version: 0.9.4
  * Requires at least: 6.2
  * Requires PHP: 8.0
  * Author: OnePalmGarden
@@ -127,6 +127,10 @@ function wsp_x_character_count( string $text ): int {
 	return false === $count ? 0 : $count;
 }
 
+function wsp_x_character_limit(): int {
+	return 200;
+}
+
 function wsp_editor_assets( string $hook_suffix ): void {
 	if ( ! in_array( $hook_suffix, array( 'post.php', 'post-new.php' ), true ) ) {
 		return;
@@ -135,7 +139,7 @@ function wsp_editor_assets( string $hook_suffix ): void {
 	if ( ! $screen || 'post' !== $screen->post_type ) {
 		return;
 	}
-	wp_enqueue_script( 'wsp-post-preview', plugin_dir_url( __FILE__ ) . 'assets/post-preview.js', array(), '0.9.2', true );
+	wp_enqueue_script( 'wsp-post-preview', plugin_dir_url( __FILE__ ) . 'assets/post-preview.js', array(), '0.9.4', true );
 }
 add_action( 'admin_enqueue_scripts', 'wsp_editor_assets' );
 
@@ -173,7 +177,7 @@ function wsp_render_share_metabox( WP_Post $post ): void {
 				$preview = wsp_x_complete_message( $post, $preview, get_permalink( $post ) );
 			}
 			?>
-			<fieldset <?php if ( 'x' === $key ) : ?>class="wsp-x-preview" data-template="<?php echo esc_attr( wsp_template( $key ) ); ?>" data-values="<?php echo esc_attr( wp_json_encode( wsp_template_values( $post ) ) ); ?>"<?php endif; ?> style="margin: 0 0 16px; padding: 12px; border: 1px solid #dcdcde;">
+			<fieldset <?php if ( 'x' === $key ) : ?>class="wsp-x-preview" data-limit="<?php echo esc_attr( (string) wsp_x_character_limit() ); ?>" data-template="<?php echo esc_attr( wsp_template( $key ) ); ?>" data-values="<?php echo esc_attr( wp_json_encode( wsp_template_values( $post ) ) ); ?>"<?php endif; ?> style="margin: 0 0 16px; padding: 12px; border: 1px solid #dcdcde;">
 				<legend style="padding: 0 6px; font-weight: 600;"><?php echo esc_html( $label ); ?></legend>
 				<label>
 					<input type="checkbox" name="wsp_platforms[<?php echo esc_attr( $key ); ?>][enabled]" value="1" <?php checked( $enabled ); ?>>
@@ -207,10 +211,10 @@ function wsp_render_share_metabox( WP_Post $post ): void {
 				<?php if ( 'x' === $key ) : ?>
 					<?php $count = wsp_x_character_count( $preview ); ?>
 					<p class="wsp-x-count" aria-live="polite">
-						<?php echo esc_html( sprintf( __( 'Tahmini karakter sayısı: %1$d / %2$d', 'wp-social-publisher' ), $count, 140 ) ); ?>
-						<?php if ( $count > 140 ) : ?> <strong><?php esc_html_e( '140 karakterlik hedef aşıldı.', 'wp-social-publisher' ); ?></strong><?php endif; ?>
+						<?php echo esc_html( sprintf( __( 'Tahmini karakter sayısı: %1$d / %2$d', 'wp-social-publisher' ), $count, wsp_x_character_limit() ) ); ?>
+						<?php if ( $count > wsp_x_character_limit() ) : ?> <strong><?php esc_html_e( '200 karakterlik hedef aşıldı.', 'wp-social-publisher' ); ?></strong><?php endif; ?>
 					</p>
-					<p class="description"><?php esc_html_e( 'Toplam 140 karakteri aşarsa X gönderimi engellenir. Taslak kaydedilebilir; X bağlantı ve emojileri farklı hesaplayabilir. Yazı bilgileri son kaydedilen sürümdendir.', 'wp-social-publisher' ); ?></p>
+					<p class="description"><?php esc_html_e( 'Toplam 200 karakteri aşarsa X gönderimi engellenir. Taslak kaydedilebilir; X bağlantı ve emojileri farklı hesaplayabilir. Yazı bilgileri son kaydedilen sürümdendir.', 'wp-social-publisher' ); ?></p>
 				<?php endif; ?>
 			</fieldset>
 		<?php endforeach; ?>
