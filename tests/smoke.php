@@ -209,6 +209,39 @@ expect( str_contains( $html, 'LinkedIn' ) && str_contains( $html, 'LinkedIn: Den
 expect( str_contains( $html, 'Eski özel metin' ), 'Önceki özel metin korunmalı' );
 expect( str_contains( $html, 'Twitter / X' ) && str_contains( $html, 'Instagram' ) && str_contains( $html, 'Reddit' ) && str_contains( $html, 'Pinterest' ) && ! str_contains( $html, '>Medium<' ) && ! str_contains( $html, '>Substack<' ), 'Yazı kutusu yeni platform listesini kullanmalı' );
 expect( str_contains( $html, 'Tahmini karakter sayısı:' ) && str_contains( $html, 'wsp-x-preview' ), 'X karakter sayacı yazıda görünmeli' );
+expect( str_contains( $html, 'wsp_x_fields[title]' ) && str_contains( $html, '🔥 {title}' ) && str_contains( $html, '👉 {url}' ) && str_contains( $html, '🔍 {hashtags}' ), 'X dört düzenlenebilir alan ve varsayılan emojileri göstermeli' );
+$_POST = array(
+	'wsp_share_nonce' => 'valid',
+	'wsp_platforms' => array( 'x' => array( 'text' => 'Eski X metni' ) ),
+	'wsp_x_fields_enabled' => '1',
+	'wsp_x_fields' => array( 'title' => '🔥 {title}', 'content' => 'İçerik', 'link' => '👉 {url}', 'tags' => '🔍 {hashtags}' ),
+	'wsp_scheduled_at' => '',
+);
+wsp_save_share_metabox( 12 );
+$x_message = wsp_post_share_message( 'x', $post );
+expect( "🔥 Deneme başlığı\n\nİçerik\n\n👉 https://example.test/deneme/\n\n🔍 #WordPress #Sosyalmedya" === $x_message, 'X özel alanları gerçek yazı verileriyle birleştirilmeli' );
+expect( $x_message === wsp_x_complete_message( $post, $x_message, get_permalink( $post ) ), 'X özel bağlantısı tekrar eklenmemeli' );
+unset( $_POST['wsp_x_fields_enabled'] );
+wsp_save_share_metabox( 12 );
+expect( 'Eski X metni' === wsp_post_share_message( 'x', $post ), 'Özel alanlar kapatılınca eski metin korunmalı' );
+expect( "Eski X metni\n\nhttps://example.test/deneme/" === wsp_x_complete_message( $post, 'Eski X metni', get_permalink( $post ) ), 'Eski X metnine eksik bağlantı eklenmeli' );
+$_POST = array(
+	'wsp_share_nonce' => 'valid',
+	'wsp_platforms' => array( 'facebook' => array( 'enabled' => '1', 'text' => 'Eski özel metin' ), 'linkedin' => array( 'enabled' => '1', 'text' => 'LinkedIn: {title}' ) ),
+	'wsp_scheduled_at' => '2026-11-18T09:30',
+);
+wsp_save_share_metabox( 12 );
+
+$bar = new class {
+	public array $nodes = array();
+	public function add_node( $node ) { $this->nodes[] = $node; }
+};
+wsp_admin_bar_menu( $bar );
+expect( 'wsp-publisher' === $bar->nodes[0]['id'] && str_contains( $bar->nodes[0]['href'], 'page=wsp-accounts' ), 'Üst menü eklentiye bağlantı içermeli' );
+$GLOBALS['permitted'] = false;
+wsp_admin_bar_menu( $bar );
+expect( 1 === count( $bar->nodes ), 'Yetkisiz kullanıcılara üst menü bağlantısı gösterilmemeli' );
+$GLOBALS['permitted'] = true;
 
 $cipher = wsp_facebook_encrypt( 'secret-token' );
 expect( ! is_wp_error( $cipher ) && ! str_contains( $cipher, 'secret-token' ), 'Belirteç şifrelenmeli' );
@@ -424,6 +457,13 @@ $GLOBALS['token_response'] = array( 'code' => 200, 'body' => '{"access_token":"x
 $refreshed_account = wsp_oauth_account( 'x' );
 expect( 'refresh_token' === $GLOBALS['token_request'][1]['body']['grant_type'] && 'x-refresh' === $GLOBALS['token_request'][1]['body']['refresh_token'], 'Süresi dolan X hesabı refresh token ile yenilenmeli' );
 expect( 'x-refreshed' === $refreshed_account['access_token'] && 'x-refresh-2' === $refreshed_account['refresh_token'], 'Yenilenen X tokenları döndürülmeli ve saklanmalı' );
+update_post_meta( 12, '_wsp_x_fields_enabled', '1' );
+$GLOBALS['response'] = array( 'code' => 201, 'body' => '{"data":{"id":"tweet-123"}}' );
+$x_result = wsp_publish_platform_post( 'x', $post, str_repeat( 'a', 140 ), get_permalink( $post ) );
+expect( ! is_wp_error( $x_result ) && str_repeat( 'a', 140 ) === json_decode( $GLOBALS['request'][1]['body'], true )['text'], '140 karakterlik özel X metni değiştirilmeden gönderilmeli' );
+$before_request = count( $GLOBALS['request_history'] );
+expect( is_wp_error( wsp_publish_platform_post( 'x', $post, str_repeat( 'a', 141 ), get_permalink( $post ) ) ) && $before_request === count( $GLOBALS['request_history'] ), '141 karakterli X metni API isteği yapılmadan reddedilmeli' );
+update_post_meta( 12, '_wsp_x_fields_enabled', '0' );
 
 $GLOBALS['profile_response'] = array( 'code' => 200, 'body' => '{"sub":"li-123","name":"LinkedIn Tester"}' );
 $profile = wsp_oauth_profile( 'linkedin', 'li-access' );
@@ -600,6 +640,29 @@ try {
 }
 expect( '2026-11-20T14:45' === get_post_meta( 12, '_wsp_scheduled_at', true ) && '1' === get_post_meta( 12, '_wsp_linkedin_enabled', true ) && '1' === get_post_meta( 12, '_wsp_facebook_enabled', true ), 'WP Auto Post seçilen yazı/platform/tarihi WordPress meta alanlarına kaydetmeli' );
 expect( false !== wp_next_scheduled( 'wsp_publish_scheduled_post', array( 12 ) ) && 'scheduled' === get_post_meta( 12, '_wsp_schedule_state', true ), 'Kaydedilen paylaşım WP-Cron kuyruğuna eklenmeli' );
+$GLOBALS['test_post'] = $post;
+$_GET = array( 'month' => '2026-11' );
+ob_start();
+wsp_calendar_page();
+$plan_calendar = ob_get_clean();
+expect( str_contains( $plan_calendar, 'Planı düzenle' ) && str_contains( $plan_calendar, 'wsp_remove_scheduled_platform' ) && str_contains( $plan_calendar, 'Plandan sil' ), 'Gelecek planlarda düzenleme ve platform silme düğmeleri görünmeli' );
+$_POST = array( 'post_id' => '12', 'platform' => 'linkedin', 'scheduled_at' => '2026-11-20T14:45' );
+$GLOBALS['nonce_valid'] = false;
+try { wsp_remove_scheduled_platform(); } catch ( RuntimeException $error ) {}
+expect( '1' === get_post_meta( 12, '_wsp_linkedin_enabled', true ), 'Geçersiz nonce ile plan silinmemeli' );
+$GLOBALS['nonce_valid'] = true;
+try {
+	wsp_remove_scheduled_platform();
+} catch ( RuntimeException $error ) {
+	expect( str_starts_with( $error->getMessage(), 'redirect:' ), 'Platform plandan çıkarılınca takvime dönülmeli' );
+}
+expect( '0' === get_post_meta( 12, '_wsp_linkedin_enabled', true ) && '1' === get_post_meta( 12, '_wsp_facebook_enabled', true ) && false !== wp_next_scheduled( 'wsp_publish_scheduled_post', array( 12 ) ), 'Yalnız seçilen platform çıkarılmalı, diğerinin cron görevi korunmalı' );
+$_POST['scheduled_at'] = '2026-11-21T14:45';
+try { wsp_remove_scheduled_platform(); } catch ( RuntimeException $error ) {}
+expect( '1' === get_post_meta( 12, '_wsp_facebook_enabled', true ), 'Eski plan bilgisi diğer platformu silmemeli' );
+$_POST = array( 'post_id' => '12', 'platform' => 'facebook', 'scheduled_at' => '2026-11-20T14:45' );
+try { wsp_remove_scheduled_platform(); } catch ( RuntimeException $error ) {}
+expect( '' === get_post_meta( 12, '_wsp_scheduled_at', true ) && false === wp_next_scheduled( 'wsp_publish_scheduled_post', array( 12 ) ), 'Son platform çıkarılınca plan ve cron görevi kaldırılmalı' );
 $GLOBALS['meta'][12]['_wsp_scheduled_at'] = ( new DateTimeImmutable( 'now', wp_timezone() ) )->modify( '-5 minutes' )->format( 'Y-m-d\TH:i' );
 $GLOBALS['meta'][12]['_wsp_facebook_enabled'] = '1';
 $GLOBALS['meta'][12]['_wsp_linkedin_enabled'] = '0';

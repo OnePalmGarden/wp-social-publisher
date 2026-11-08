@@ -16,6 +16,18 @@ function wsp_admin_menu(): void {
 }
 add_action( 'admin_menu', 'wsp_admin_menu' );
 
+function wsp_admin_bar_menu( $bar ): void {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+	$bar->add_node( array(
+		'id'    => 'wsp-publisher',
+		'title' => 'Social Publisher',
+		'href'  => admin_url( 'admin.php?page=wsp-accounts' ),
+	) );
+}
+add_action( 'admin_bar_menu', 'wsp_admin_bar_menu', 100 );
+
 function wsp_admin_assets( string $hook_suffix ): void {
 	if ( ! isset( $_GET['page'] ) || ! is_string( $_GET['page'] ) ) {
 		return;
@@ -392,6 +404,33 @@ function wsp_save_auto_post(): void {
 }
 add_action( 'admin_post_wsp_save_auto_post', 'wsp_save_auto_post' );
 
+function wsp_remove_scheduled_platform(): void {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( esc_html__( 'Bu işlem için yetkiniz yok.', 'wp-social-publisher' ) );
+	}
+	check_admin_referer( 'wsp_remove_scheduled_platform' );
+	$post_id = isset( $_POST['post_id'] ) && is_scalar( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+	$platform = isset( $_POST['platform'] ) && is_string( $_POST['platform'] ) ? sanitize_key( wp_unslash( $_POST['platform'] ) ) : '';
+	$scheduled = isset( $_POST['scheduled_at'] ) && is_string( $_POST['scheduled_at'] ) ? sanitize_text_field( wp_unslash( $_POST['scheduled_at'] ) ) : '';
+	$date = DateTimeImmutable::createFromFormat( '!Y-m-d\TH:i', $scheduled, wp_timezone() );
+	$post = get_post( $post_id );
+	if ( ! $post || 'post' !== $post->post_type || ! current_user_can( 'edit_post', $post_id ) || ! isset( wsp_platforms()[ $platform ] ) || '1' !== get_post_meta( $post_id, '_wsp_' . $platform . '_enabled', true ) || get_post_meta( $post_id, '_wsp_scheduled_at', true ) !== $scheduled || ! $date || $date->format( 'Y-m-d\TH:i' ) !== $scheduled || $date->getTimestamp() <= time() || get_post_meta( $post_id, '_wsp_schedule_processed_at', true ) === $scheduled ) {
+		wsp_admin_redirect( 'wsp-calendar', 'Plan değişmiş, başlamış veya silinemiyor. Takvimi yenileyin.', true );
+	}
+	update_post_meta( $post_id, '_wsp_' . $platform . '_enabled', '0' );
+	if ( ! wsp_selected_platforms( $post_id ) ) {
+		$cleared = wp_clear_scheduled_hook( 'wsp_publish_scheduled_post', array( $post_id ), true );
+		if ( is_wp_error( $cleared ) || false === $cleared ) {
+			update_post_meta( $post_id, '_wsp_' . $platform . '_enabled', '1' );
+			wsp_admin_redirect( 'wsp-calendar', 'Cron görevi kaldırılamadı; plan korunuyor.', true );
+		}
+		delete_post_meta( $post_id, '_wsp_scheduled_at' );
+		update_post_meta( $post_id, '_wsp_schedule_state', 'unscheduled' );
+	}
+	wsp_admin_redirect( 'wsp-calendar&month=' . $date->format( 'Y-m' ), 'Seçilen platform plandan çıkarıldı.' );
+}
+add_action( 'admin_post_wsp_remove_scheduled_platform', 'wsp_remove_scheduled_platform' );
+
 function wsp_admin_redirect( string $page, string $message, bool $error = false ): void {
 	set_transient( 'wsp_admin_notice_' . get_current_user_id(), array( 'message' => $message, 'error' => $error ), 60 );
 	wp_safe_redirect( admin_url( 'admin.php?page=' . $page ) );
@@ -548,6 +587,8 @@ function wsp_calendar_page(): void {
 				'platform'  => $platform,
 				'label'     => $label,
 				'status'    => '' === $platform ? 'Eksik plan' : $plan_status,
+				'scheduled' => $scheduled,
+				'editable'  => '' !== $platform && ( new DateTimeImmutable( $scheduled, wp_timezone() ) )->getTimestamp() > time() && get_post_meta( $post->ID, '_wsp_schedule_processed_at', true ) !== $scheduled,
 			);
 		}
 	}
@@ -582,7 +623,7 @@ function wsp_calendar_page(): void {
 	<div class="wrap">
 		<h1><?php esc_html_e( 'Calendar / Paylaşım takvimi', 'wp-social-publisher' ); ?></h1>
 		<?php wsp_notice(); wsp_admin_notice(); ?>
-		<p><?php esc_html_e( 'Planlanan paylaşımlar ve Share Now gönderim sonuçları, seçili platform ve durumlarıyla gösterilir. Plan tarihi paylaşımı otomatik başlatmaz.', 'wp-social-publisher' ); ?></p>
+		<p><?php esc_html_e( 'Planlar ve gönderim sonuçları platform ve durumlarıyla gösterilir. Düzenleme yazının tüm platformları için ortak plan tarihini değiştirir; silme yalnızca seçilen platformu plandan çıkarır.', 'wp-social-publisher' ); ?></p>
 		<div class="wsp-calendar-legend" aria-label="<?php esc_attr_e( 'Takvim durum açıklamaları', 'wp-social-publisher' ); ?>">
 			<span class="wsp-event-planned"><?php esc_html_e( 'Planlandı', 'wp-social-publisher' ); ?></span>
 			<span class="wsp-event-success"><?php esc_html_e( 'Paylaşıldı', 'wp-social-publisher' ); ?></span>
@@ -630,6 +671,17 @@ function wsp_calendar_page(): void {
 								<?php if ( ! empty( $event['post_id'] ) ) : ?>
 									<a class="wsp-event-title" href="<?php echo esc_url( get_edit_post_link( $event['post_id'] ) ); ?>"><?php echo esc_html( $event['title'] ); ?></a>
 								<?php else : ?><span class="wsp-event-title"><?php echo esc_html( $event['title'] ); ?></span><?php endif; ?>
+								<?php if ( 'plan' === $event['type'] && $event['editable'] && current_user_can( 'edit_post', $event['post_id'] ) ) : ?>
+									<a class="button button-small" href="<?php echo esc_url( get_edit_post_link( $event['post_id'] ) ); ?>"><?php esc_html_e( 'Planı düzenle', 'wp-social-publisher' ); ?></a>
+									<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Bu platformu plandan çıkarmak istiyor musunuz?');">
+										<input type="hidden" name="action" value="wsp_remove_scheduled_platform">
+										<input type="hidden" name="post_id" value="<?php echo esc_attr( (string) $event['post_id'] ); ?>">
+										<input type="hidden" name="platform" value="<?php echo esc_attr( $event['platform'] ); ?>">
+										<input type="hidden" name="scheduled_at" value="<?php echo esc_attr( $event['scheduled'] ); ?>">
+										<?php wp_nonce_field( 'wsp_remove_scheduled_platform' ); ?>
+										<button type="submit" class="button button-small"><?php esc_html_e( 'Plandan sil', 'wp-social-publisher' ); ?></button>
+									</form>
+								<?php endif; ?>
 							</div>
 						<?php endforeach; ?>
 					<?php endif; ?>

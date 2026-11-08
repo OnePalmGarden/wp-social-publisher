@@ -4,7 +4,7 @@ WordPress yazıları için Twitter / X, LinkedIn, Facebook, Instagram, Reddit ve
 
 ## Bu sürümde
 
-Sürüm 0.9.1; X, LinkedIn, Instagram, Reddit ve Pinterest için OAuth 2.0 hesap bağlantısı; Facebook Sayfası için erişim belirteci bağlantısı içerir. **Share Now** onayından sonra tüm bağlı platformlar için gönderi API'leri kullanılır. X'te 140 karakterlik kişisel hedef aşılırsa gönderim engellenir; LinkedIn'de öne çıkan görsel yüklenir; Instagram ve Pinterest görsel gönderisi için HTTPS üzerinden herkese açık öne çıkan görsel gerekir; Reddit bağlantı gönderisini Accounts sayfasında seçilen subreddit'e yollar. API ürün erişimi, uygulama incelemesi ve hesap izinleri platform sağlayıcısının kontrolündedir.
+Sürüm 0.9.2; X, LinkedIn, Instagram, Reddit ve Pinterest için OAuth 2.0 hesap bağlantısı; Facebook Sayfası için erişim belirteci bağlantısı içerir. **Share Now** onayından sonra tüm bağlı platformlar için gönderi API'leri kullanılır. X'te 140 karakterlik kişisel hedef aşılırsa gönderim engellenir; LinkedIn'de öne çıkan görsel yüklenir; Instagram ve Pinterest görsel gönderisi için HTTPS üzerinden herkese açık öne çıkan görsel gerekir; Reddit bağlantı gönderisini Accounts sayfasında seçilen subreddit'e yollar. API ürün erişimi, uygulama incelemesi ve hesap izinleri platform sağlayıcısının kontrolündedir.
 
 **WP Auto Post** ve yazı düzenleyicisindeki tarih alanı seçilen bağlı hesaplar için WordPress tek seferlik cron görevleri oluşturur ve zamanı gelince canlı yayın dener. Gönderim sonuçları **Logs**, durumları **WP Post Schedules** ve **Calendar** ekranlarında gösterilir. WP-Cron ziyaret trafiğiyle çalıştığından düşük trafikli sitelerde gönderi tam dakikasında çalışmayabilir; dakiklik için hosting sağlayıcınızın zamanlanmış cron özelliğiyle `wp-cron.php` dosyasını düzenli çalıştırın. Kuyruk aynı planı yinelenen cron tetiklemelerine karşı korur; başarısız/belirsiz gönderiyi otomatik tekrar denemez.
 
@@ -44,9 +44,9 @@ Yazının **öne çıkan görseli** LinkedIn'e ayrı medya olarak yüklenir; Ins
 
 ## X karakter sayacı
 
-Yazının Twitter / X bölümünde tüm oluşturulmuş mesajın Unicode karakter sayısı ve **140 karakterlik kişisel hedef** gösterilir. Yazıya özel metni değiştirince sayaç ve o alanın önizlemesi canlı güncellenir; başlık, özet, bağlantı ve etiketler en son kaydedilmiş yazı bilgileridir. Kaydedip düzenleyiciyi yeniden açarak güncel yazı bilgileriyle kontrol edin.
+Yazının Twitter / X bölümünde isteğe bağlı dört alanlı özel taslağı etkinleştirin. Başlık, içerik, link ve etiketleri düzenleyebilir, her alanın ve tamamının Unicode karakter sayısını görebilirsiniz. Başlangıçta 🔥, 👉 ve 🔍 içeren alanlarda akıllı etiketler kullanılabilir. Etkinleştirilmezse önceki özel metin veya Templates şablonu korunur. Başlık, özet, bağlantı ve etiketler en son kaydedilmiş yazı bilgileridir; güncel yazı bilgileri için kaydedip düzenleyiciyi yeniden açın.
 
-Bu bir tahmindir: X, bağlantıları ve bazı Unicode karakterlerini farklı ağırlıklarla hesaplayabilir. Gösterge, X'in gerçek kabul sınırını doğrulamaz ve hiçbir metni otomatik olarak kısaltmaz.
+Bu bir tahmindir: X, bağlantıları ve bazı Unicode karakterlerini farklı ağırlıklarla hesaplayabilir. Gösterge X'in gerçek kabul sınırını doğrulamaz. Taslak kaydedilebilir ama toplam 140 karakteri aşarsa gönderim engellenir; metin otomatik kısaltılmaz.
 
 ## Hesapları bağlama ve bağlantıyı test etme
 
@@ -98,7 +98,7 @@ OAuth Client Secret ve erişim/yenileme belirteçleri veritabanında şifrelenir
 
 ## Planlar ve takvim
 
-**WP Auto Post** sayfasında kategoriyle yazı listesini süzebilir, bağlı platform hesaplarını seçebilir ve tarih/saat planlayabilirsiniz. Yan panel son planlanan 10 gönderiyi kategori, saat ve durumla gösterir. **WP Post Schedules** kategori ve tarih aralığı filtreleriyle planları listeler. Bu saat WordPress'in **Ayarlar → Genel** ekranındaki saat dilimindedir. Plan saatinde WP-Cron canlı gönderim yapar; başarısız/belirsiz sonuçlar Logs'a yazılır ve yinelenme riskine karşı otomatik yeniden denenmez.
+**WP Auto Post** sayfasında kategoriyle yazı listesini süzebilir, bağlı platform hesaplarını seçebilir ve tarih/saat planlayabilirsiniz. Yan panel son planlanan 10 gönderiyi kategori, saat ve durumla gösterir. **WP Post Schedules** kategori ve tarih aralığı filtreleriyle planları listeler. **Calendar** üzerindeki gelecekteki planlarda düzenle düğmesi yazı düzenleyicisini açar; plan tarihi tüm seçili platformlar için ortaktır. Sil düğmesi yalnız seçilen platformu plandan çıkarır; son platform da çıkarılırsa plan ve cron görevi kaldırılır. Yazı veya gönderim kayıtları silinmez. İşlenmiş ve geçmiş planlar için bu düğmeler gösterilmez. Bu saat WordPress'in **Ayarlar → Genel** ekranındaki saat dilimindedir. Plan saatinde WP-Cron canlı gönderim yapar; başarısız/belirsiz sonuçlar Logs'a yazılır ve yinelenme riskine karşı otomatik yeniden denenmez.
 
 ## Uyumluluk
 

@@ -176,7 +176,7 @@ function wsp_publish_platform_post( string $platform, WP_Post $post, string $mes
 		return wsp_linkedin_publish_post( $account['access_token'], (string) $account['profile']['id'], $message, (int) get_post_thumbnail_id( $post ), get_the_title( $post ) );
 	}
 	if ( 'x' === $platform ) {
-		$x_message = $message . "\n\n" . $link;
+		$x_message = wsp_x_complete_message( $post, $message, $link );
 		if ( wsp_x_character_count( $x_message ) > 140 ) {
 			return new WP_Error( 'x_character_limit', 'X gönderisi bağlantıyla birlikte 140 karakterlik hedefi aşıyor; metni kısaltın.' );
 		}
@@ -227,8 +227,7 @@ function wsp_sync_scheduled_post( int $post_id ): bool {
 }
 
 function wsp_schedule_delivery_log( string $platform, WP_Post $post, string $scheduled ) {
-	$custom = (string) get_post_meta( $post->ID, '_wsp_' . $platform . '_text', true );
-	$message = wsp_render_template( '' !== $custom ? $custom : wsp_template( $platform ), $post );
+	$message = wsp_post_share_message( $platform, $post );
 	$link = get_permalink( $post );
 	if ( 'linkedin' === $platform && is_string( $link ) && ! str_contains( $message, $link ) ) {
 		$message = rtrim( $message ) . "\n\n" . $link;

@@ -359,14 +359,16 @@ function wsp_facebook_preview(): void {
 	if ( is_wp_error( $account ) || ! $post || 'post' !== $post->post_type || 'publish' !== $post->post_status || '' !== $post->post_password || ! current_user_can( 'edit_post', $post_id ) ) {
 		wsp_facebook_redirect( 'wsp-share-now', 'Hesap veya yayımlanmış şifresiz yazı bulunamadı.', true );
 	}
-	$custom = (string) get_post_meta( $post_id, '_wsp_' . $platform . '_text', true );
-	$message = wsp_render_template( '' !== $custom ? $custom : wsp_template( $platform ), $post );
+	$message = wsp_post_share_message( $platform, $post );
 	$link = get_permalink( $post );
 	if ( '' === trim( $message ) || ! is_string( $link ) || ! wp_http_validate_url( $link ) ) {
 		wsp_facebook_redirect( 'wsp-share-now', 'Mesaj veya yazı bağlantısı geçersiz.', true );
 	}
 	if ( 'linkedin' === $platform && ! str_contains( $message, $link ) ) {
 		$message = rtrim( $message ) . "\n\n" . $link;
+	}
+	if ( 'x' === $platform ) {
+		$message = wsp_x_complete_message( $post, $message, $link );
 	}
 	$image_url = get_the_post_thumbnail_url( $post, 'large' );
 	$id = wp_generate_password( 32, false, false );
