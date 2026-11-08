@@ -4,11 +4,13 @@ WordPress yazıları için Twitter / X, LinkedIn, Facebook, Instagram, Reddit ve
 
 ## Bu sürümde
 
-Sürüm 0.8.0; X ve LinkedIn kullanıcı hesapları için resmi OAuth 2.0 giriş ve profil doğrulaması sunar, Facebook Sayfası bağlantısı önceki Sayfa erişim belirteci formuyla sürer. Instagram, Reddit ve Pinterest şablon/yazı planı seçenekleri olarak eklenmiştir; bu platformlara hesap bağlantısı veya gönderim API'si henüz yoktur. **Share Now**, Facebook ve LinkedIn'e tekil gönderi için görsel önizleme ve ayrı kullanıcı onayı ister. LinkedIn'de uygun öne çıkan JPEG/PNG görsel, onay sırasında LinkedIn Images API'ye yüklenir ve yazı paylaşımına eklenir. **WP Auto Post** bir yazı, platform ve tarih seçerek planı takvime kaydeder; gönderimi otomatik yapmaz. Gerçek otomatik yayın için gönderim kuyruğu/çalıştırıcısı henüz yoktur. LinkedIn gönderileri için uygulamada `w_member_social` kapsamı ve LinkedIn **Share on LinkedIn** ürün erişimi gerekir.
+Sürüm 0.9.0; X, LinkedIn, Instagram, Reddit ve Pinterest için OAuth 2.0 hesap bağlantısı; Facebook Sayfası için erişim belirteci bağlantısı içerir. **Share Now** onayından sonra tüm bağlı platformlar için gönderi API'leri kullanılır. X'te 140 karakterlik kişisel hedef aşılırsa gönderim engellenir; LinkedIn'de öne çıkan görsel yüklenir; Instagram ve Pinterest görsel gönderisi için HTTPS üzerinden herkese açık öne çıkan görsel gerekir; Reddit bağlantı gönderisini Accounts sayfasında seçilen subreddit'e yollar. API ürün erişimi, uygulama incelemesi ve hesap izinleri platform sağlayıcısının kontrolündedir.
+
+**WP Auto Post** ve yazı düzenleyicisindeki tarih alanı seçilen bağlı hesaplar için WordPress tek seferlik cron görevleri oluşturur ve zamanı gelince canlı yayın dener. Gönderim sonuçları **Logs**, durumları **WP Post Schedules** ve **Calendar** ekranlarında gösterilir. WP-Cron ziyaret trafiğiyle çalıştığından düşük trafikli sitelerde gönderi tam dakikasında çalışmayabilir; dakiklik için hosting sağlayıcınızın zamanlanmış cron özelliğiyle `wp-cron.php` dosyasını düzenli çalıştırın. Kuyruk aynı planı yinelenen cron tetiklemelerine karşı korur; başarısız/belirsiz gönderiyi otomatik tekrar denemez.
 
 **Calendar** planları ve Share Now gönderim sonuçlarını gerçekleştiği tarihte, platform ve durum etiketiyle gösterir. **Logs** en son 200 Share Now gönderim girişimini platform, yazı, sonuç ve platform gönderi kimliğiyle listeler; platform, durum ve site saat dilimindeki gün ile filtrelenebilir. Paylaşım metni ve erişim belirteçleri kayıtlara yazılmaz. Ağ hatalarında platform gönderimi almış olabilir; tekrar denemeden önce hedef hesabı kontrol edin.
 
-Instagram, Reddit ve Pinterest şu an yalnızca metabox, şablon ve planlama ekranlarında görünür; hesap bağlantısı ve gönderi yayınlama henüz desteklenmez. Resmi API erişimi eklenmeden bu platformlar paylaşım yapmaz. Eklenti parola toplamaz veya resmi olmayan tarayıcı otomasyonuyla giriş yapmaz.
+Hesap parolaları istenmez; bağlantı resmi OAuth akışları üzerinden yapılır. Geliştirici uygulaması oluşturma, OAuth Redirect URI kaydı ve platformun yayınlama izinlerinin onaylanması kullanıcı tarafından tamamlanmalıdır. Bu depo içindeki testler gerçek platform hesabına gönderi yapmaz.
 
 ## Kurulum ve güncelleme
 
@@ -35,7 +37,7 @@ Güncellemeden önce sitenizin yedeğini alın. Mevcut yazıların platform seç
 
 Yazı kutusundaki yazıya özel metin, varsayılan şablonun tamamının yerine kullanılır. Özel metni boş bırakırsanız varsayılan şablon kullanılır. Özel metin de aynı yer tutucuları destekler.
 
-Yazının **öne çıkan görseli** LinkedIn gönderisine ayrı medya olarak yüklenir. Facebook, bağlantı önizlemesini kendi kurallarına göre oluşturabilir; Instagram, Reddit ve Pinterest için gönderi uç noktası henüz yoktur. Platform sırası Twitter / X, LinkedIn, Facebook, Instagram, Reddit ve Pinterest'tir. Eski Medium/Substack yazı meta verileri veritabanından silinmez; yeni arayüzde görünmez.
+Yazının **öne çıkan görseli** LinkedIn'e ayrı medya olarak yüklenir; Instagram ve Pinterest API gönderilerinde görsel URL'si olarak kullanılır. Facebook bağlantı önizlemesini kendi kurallarına göre oluşturabilir. Platform sırası Twitter / X, LinkedIn, Facebook, Instagram, Reddit ve Pinterest'tir. Eski Medium/Substack yazı meta verileri veritabanından silinmez; yeni arayüzde görünmez.
 
 ## X karakter sayacı
 
@@ -45,7 +47,7 @@ Bu bir tahmindir: X, bağlantıları ve bazı Unicode karakterlerini farklı ağ
 
 ## Hesapları bağlama ve bağlantıyı test etme
 
-**Social Publisher → Accounts** ekranında soldan Twitter / X, LinkedIn veya Facebook seçin. Tüm parola, gizli anahtar ve belirteç girişleri yalnızca HTTPS üzerindeki WordPress yönetim panelinde yapılmalıdır. Bunları sohbet, e-posta, ekran görüntüsü veya genel depoda paylaşmayın.
+**Social Publisher → Accounts** ekranında platformu seçin. X, LinkedIn, Instagram, Reddit ve Pinterest için ilgili geliştirici uygulamasının Client ID/Secret değerlerini kaydedip resmi OAuth düğmesini kullanın. Reddit'te hedef subreddit, Pinterest'te pano seçimi de aynı uygulama formunda ayarlanır. Facebook bağlantısı Sayfa erişim belirteciyle sürer. Tüm kimlik bilgileri yalnızca HTTPS üzerindeki WordPress yönetim paneline girilmelidir; sohbet, e-posta, ekran görüntüsü veya genel depoda paylaşmayın.
 
 ### Twitter / X
 
@@ -53,7 +55,7 @@ Bu bir tahmindir: X, bağlantıları ve bazı Unicode karakterlerini farklı ağ
 2. Eklentide Twitter / X hesabını seçin. Gösterilen **OAuth Redirect URI** adresini X uygulamasındaki callback listesine aynen ekleyin.
 3. X'in verdiği **Client ID** ve **Client Secret** değerlerini eklentiye girip kaydedin.
 4. **Twitter / X ile güvenli giriş** düğmesine basıp X'te yetkilendirin. Dönüşte kullanıcı profili doğrulanır ve hesap WordPress'e kaydedilir.
-5. **Bağlantıyı test et** düğmesi profili yeniden API'den okur. Bu sürümde X'e gönderi yayınlanmaz.
+5. **Bağlantıyı test et** profili yeniden API'den okur. Share Now ile X'e metin ve bağlantı gönderilebilir; birleşik metin 140 karakteri aşarsa eklenti göndermeyi reddeder.
 
 Eklenti `users.read`, `tweet.read`, `tweet.write` ve `offline.access` izinlerini ister; API erişim planı, hesap ve gönderi yazma hakları X tarafından belirlenir. Giriş ve profil testi başarılı olsa bile gönderi izni garanti edilmez.
 
@@ -66,6 +68,18 @@ Eklenti `users.read`, `tweet.read`, `tweet.write` ve `offline.access` izinlerini
 5. **Bağlantıyı test et** düğmesi hesabı yeniden kontrol eder. Gönderi paylaşmak için LinkedIn'in ayrı **Share on LinkedIn** ürün izni gerekir; erişim LinkedIn onayına bağlıdır.
 
 Bağlı hesaba deneme gönderisi için **Share Now** sayfasında LinkedIn'i ve yayımlanmış, şifresiz bir yazıyı seçin. Önizlemede öne çıkan görsel görünmelidir; JPEG/PNG ve en fazla 10 MB olmalıdır. Görsel yoksa paylaşım metin ve bağlantı olarak gönderilir. Gönderi ancak **Onayla ve LinkedIn'de paylaş** onayıyla yayımlanır. Başarı ve API hataları **Logs** sayfasına kaydedilir. LinkedIn uygulamasında **Share on LinkedIn** ürün erişimi ve OAuth sırasında verilen `w_member_social` yetkisi zorunludur. Ürün veya kapsam sonradan açıldıysa hesabı yeniden bağlayıp yetkiyi yeniden verin. Logs'taki HTTP durum kodunu kontrol edin; 401/403 genellikle token, ürün erişimi veya izin eksikliğini gösterir. Bağlantı testi gönderi iznini veya API yayınlamasını test etmez.
+
+### Instagram
+
+Instagram'da **Professional (Business veya Creator)** hesap ve Instagram Login destekli geliştirici uygulaması gerekir. Redirect URI'yi uygulamaya aynen ekleyin; `instagram_business_basic` ve `instagram_business_content_publish` izinlerini etkinleştirin. Bu sürüm tek görselli gönderi oluşturur; yazı için herkese açık HTTPS öne çıkan görsel gerekir. Blog bağlantısı caption metninde görünür ancak normal Instagram caption'ında tıklanabilir değildir. Instagram'ın API/App Review koşulları ve hesabın profesyonel durumu gönderim iznini belirler.
+
+### Reddit
+
+Reddit Developer settings'te **web app** oluşturun ve callback URL'yi aynen kaydedin. Eklentide uygulama Client ID/Secret'ını, hedef subreddit adını (`r/` olmadan) kaydedin, ardından **Reddit ile güvenli giriş** adımını tamamlayın. Gönderi yazının başlığı ve bağlantısı olarak oluşturulur; subreddit'in spam/otomasyon kuralları ve Reddit API erişimi geçerlidir.
+
+### Pinterest
+
+Pinterest Developer uygulamasında `user_accounts:read`, `boards:read` ve `pins:write` izinlerini etkinleştirip callback adresini kaydedin. OAuth ile bağlandıktan sonra Accounts formundaki pano alanında mevcut pano kimliğini seçin. Pin için herkese açık HTTPS öne çıkan görseli gerekir; başlık, açıklama ve yazı bağlantısı Pin'e eklenir.
 
 ### Facebook Sayfası
 
@@ -81,7 +95,7 @@ OAuth Client Secret ve erişim/yenileme belirteçleri veritabanında şifrelenir
 
 ## Planlar ve takvim
 
-**WP Auto Post** sayfasında yazıyı, bir veya daha fazla platformu ve tarih/saat bilgisini seçerek plan oluşturabilirsiniz. Bu saat WordPress'in **Ayarlar → Genel** ekranındaki saat dilimindedir. Planlar **WP Post Schedules** ve **Calendar** ekranlarında listelenir; Calendar ayrıca gönderim sonuçlarını gerçek gönderim gününde gösterir. Plan kaydetmek veya WordPress yazısını yayımlamak, otomatik gönderim başlatmaz; zamanlanmış gönderi kuyruğu/çalıştırıcısı henüz bulunmuyor.
+**WP Auto Post** sayfasında kategoriyle yazı listesini süzebilir, bağlı platform hesaplarını seçebilir ve tarih/saat planlayabilirsiniz. Yan panel son planlanan 10 gönderiyi kategori, saat ve durumla gösterir. **WP Post Schedules** kategori ve tarih aralığı filtreleriyle planları listeler. Bu saat WordPress'in **Ayarlar → Genel** ekranındaki saat dilimindedir. Plan saatinde WP-Cron canlı gönderim yapar; başarısız/belirsiz sonuçlar Logs'a yazılır ve yinelenme riskine karşı otomatik yeniden denenmez.
 
 ## Uyumluluk
 

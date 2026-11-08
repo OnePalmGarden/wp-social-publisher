@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Social Publisher
  * Description: Yazılar için platform bazlı sosyal paylaşım metinleri ve planlama taslağı.
- * Version: 0.8.0
+ * Version: 0.9.0
  * Requires at least: 6.2
  * Requires PHP: 8.0
  * Author: OnePalmGarden
@@ -17,6 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 require_once __DIR__ . '/includes/admin.php';
 require_once __DIR__ . '/includes/facebook.php';
 require_once __DIR__ . '/includes/oauth-accounts.php';
+require_once __DIR__ . '/includes/publishing.php';
 
 function wsp_platforms(): array {
 	return array(
@@ -169,7 +170,6 @@ function wsp_render_share_metabox( WP_Post $post ): void {
 		<input type="datetime-local" id="wsp-scheduled-at" name="wsp_scheduled_at" value="<?php echo esc_attr( (string) get_post_meta( $post->ID, '_wsp_scheduled_at', true ) ); ?>">
 		<span class="description"><?php esc_html_e( 'Seçili tüm platformlar için ortak tarih; WordPress sitenizin saat dilimi kullanılır.', 'wp-social-publisher' ); ?></span>
 	</p>
-	<p><strong><?php esc_html_e( 'Deneme sürümü:', 'wp-social-publisher' ); ?></strong> <?php esc_html_e( 'Bu sürüm seçimleri kaydeder; sosyal platformlara gönderim yapmaz.', 'wp-social-publisher' ); ?></p>
 	<?php
 }
 
@@ -217,6 +217,7 @@ function wsp_save_share_metabox( int $post_id ): void {
 
 	if ( '' === $scheduled_at ) {
 		delete_post_meta( $post_id, '_wsp_scheduled_at' );
+		wsp_sync_scheduled_post( $post_id );
 		return;
 	}
 
@@ -224,6 +225,7 @@ function wsp_save_share_metabox( int $post_id ): void {
 	$errors = DateTimeImmutable::getLastErrors();
 	if ( false !== $date && ( false === $errors || ( 0 === $errors['warning_count'] && 0 === $errors['error_count'] ) ) && $date->format( 'Y-m-d\TH:i' ) === $scheduled_at ) {
 		update_post_meta( $post_id, '_wsp_scheduled_at', $scheduled_at );
+		wsp_sync_scheduled_post( $post_id );
 	}
 }
 add_action( 'save_post', 'wsp_save_share_metabox' );

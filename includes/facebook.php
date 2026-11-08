@@ -156,11 +156,22 @@ function wsp_shareable_platforms(): array {
 		$available['facebook'] = sprintf( 'Facebook — %s', ! empty( $facebook['name'] ) ? $facebook['name'] : $facebook['page_id'] );
 	}
 	$accounts = get_option( 'wsp_oauth_accounts', array() );
-	if ( is_array( $accounts ) && ! empty( $accounts['linkedin']['access_token'] ) && ! empty( $accounts['linkedin']['profile']['id'] ) ) {
-		$name = ! empty( $accounts['linkedin']['profile']['name'] ) ? $accounts['linkedin']['profile']['name'] : $accounts['linkedin']['profile']['id'];
-		$available['linkedin'] = sprintf( 'LinkedIn — %s', $name );
+	if ( is_array( $accounts ) ) {
+		foreach ( wsp_oauth_providers() as $platform => $provider ) {
+			if ( empty( $accounts[ $platform ]['access_token'] ) || empty( $accounts[ $platform ]['profile']['id'] ) ) {
+				continue;
+			}
+			$name = ! empty( $accounts[ $platform ]['profile']['name'] ) ? $accounts[ $platform ]['profile']['name'] : $accounts[ $platform ]['profile']['id'];
+			$available[ $platform ] = sprintf( '%s — %s', wsp_platforms()[ $platform ], $name );
+		}
 	}
-	return $available;
+	$ordered = array();
+	foreach ( wsp_platforms() as $platform => $label ) {
+		if ( isset( $available[ $platform ] ) ) {
+			$ordered[ $platform ] = $available[ $platform ];
+		}
+	}
+	return $ordered;
 }
 
 function wsp_delivery_log_add( array $entry ): bool {
@@ -193,13 +204,13 @@ function wsp_share_platform_account( string $platform ) {
 	if ( 'facebook' === $platform ) {
 		return wsp_facebook_account();
 	}
-	if ( 'linkedin' === $platform ) {
-		$account = wsp_oauth_account( 'linkedin' );
+	if ( isset( wsp_oauth_providers()[ $platform ] ) ) {
+		$account = wsp_oauth_account( $platform );
 		if ( is_wp_error( $account ) ) {
 			return $account;
 		}
 		if ( empty( $account['profile']['id'] ) || ! is_string( $account['profile']['id'] ) ) {
-			return new WP_Error( 'linkedin_profile_missing', 'LinkedIn hesap profili eksik. Hesabı yeniden bağlayın.' );
+			return new WP_Error( 'social_profile_missing', 'Platform hesabı profili eksik. Hesabı yeniden bağlayın.' );
 		}
 		return $account;
 	}
@@ -209,7 +220,7 @@ function wsp_share_platform_account( string $platform ) {
 function wsp_share_platform_name( string $platform, array $account ): string {
 	return 'facebook' === $platform
 		? sprintf( 'Facebook — %s', ! empty( $account['name'] ) ? $account['name'] : $account['page_id'] )
-		: sprintf( 'LinkedIn — %s', ! empty( $account['profile']['name'] ) ? $account['profile']['name'] : $account['profile']['id'] );
+		: sprintf( '%s — %s', wsp_platforms()[ $platform ], ! empty( $account['profile']['name'] ) ? $account['profile']['name'] : $account['profile']['id'] );
 }
 
 function wsp_render_share_confirmation( string $id, array $draft ): void {
@@ -240,13 +251,29 @@ function wsp_render_share_confirmation( string $id, array $draft ): void {
 				<h2><?php esc_html_e( 'Gönderiyi onayla', 'wp-social-publisher' ); ?></h2>
 				<p><strong><?php esc_html_e( 'Hedef:', 'wp-social-publisher' ); ?></strong> <?php echo esc_html( $draft['target'] ); ?></p>
 				<p><?php echo esc_html( sprintf( __( 'Onayladığınızda gönderi hemen %s hesabında yayımlanır.', 'wp-social-publisher' ), $platform_label ) ); ?></p>
-				<p class="description"><?php esc_html_e( 'LinkedIn paylaşımında öne çıkan JPEG/PNG görsel varsa onaydan sonra gönderiye yüklenir; metinde ayrıca yazı bağlantısı bulunur.', 'wp-social-publisher' ); ?></p>
+				<p class="description">
+					<?php
+					if ( 'instagram' === $platform ) {
+						esc_html_e( 'Instagram tek görselli gönderi oluşturur; herkese açık HTTPS öne çıkan görsel zorunludur. Yazı bağlantısı açıklama metnine eklenir ve Instagram bunu tıklanabilir yapmaz.', 'wp-social-publisher' );
+					} elseif ( 'pinterest' === $platform ) {
+						esc_html_e( 'Pinterest Pin için öne çıkan görsel ve Accounts sayfasında seçilmiş pano gerekir.', 'wp-social-publisher' );
+					} elseif ( 'reddit' === $platform ) {
+						esc_html_e( 'Reddit gönderisi yazı başlığını ve yazı bağlantısını seçilmiş subreddit’e yollar.', 'wp-social-publisher' );
+					} elseif ( 'linkedin' === $platform ) {
+						esc_html_e( 'LinkedIn paylaşımında öne çıkan JPEG/PNG görsel varsa onaydan sonra gönderiye yüklenir; metinde ayrıca yazı bağlantısı bulunur.', 'wp-social-publisher' );
+					} elseif ( 'x' === $platform ) {
+						esc_html_e( 'X gönderisine bağlantı eklenir; yazı ve bağlantının toplamı 140 karakterlik hedefi aşarsa gönderim yapılmaz.', 'wp-social-publisher' );
+					} else {
+						esc_html_e( 'Facebook bağlantı görselini kendi önizleme kurallarıyla oluşturabilir.', 'wp-social-publisher' );
+					}
+					?>
+				</p>
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 					<input type="hidden" name="action" value="wsp_facebook_publish">
 					<input type="hidden" name="draft" value="<?php echo esc_attr( $id ); ?>">
 					<input type="hidden" name="platform" value="<?php echo esc_attr( $platform ); ?>">
 					<?php wp_nonce_field( 'wsp_facebook_publish_' . $id ); ?>
-					<?php submit_button( 'facebook' === $platform ? __( 'Onayla ve Facebook’ta paylaş', 'wp-social-publisher' ) : __( 'Onayla ve LinkedIn’de paylaş', 'wp-social-publisher' ), 'primary', 'submit', true, array( 'class' => 'button button-primary button-large' ) ); ?>
+					<?php submit_button( sprintf( __( 'Onayla ve %s’ta paylaş', 'wp-social-publisher' ), $platform_label ), 'primary', 'submit', true, array( 'class' => 'button button-primary button-large' ) ); ?>
 				</form>
 				<a class="button button-secondary" href="<?php echo esc_url( admin_url( 'admin.php?page=wsp-share-now' ) ); ?>"><?php esc_html_e( 'Geri dön', 'wp-social-publisher' ); ?></a>
 			</aside>
@@ -257,11 +284,12 @@ function wsp_render_share_confirmation( string $id, array $draft ): void {
 
 function wsp_share_now_page(): void {
 	$platforms = wsp_shareable_platforms();
-	$query = new WP_Query( array( 'post_type' => 'post', 'post_status' => 'publish', 'posts_per_page' => 100, 'orderby' => 'date', 'order' => 'DESC', 'has_password' => false ) );
+	$category = isset( $_GET['cat'] ) && is_scalar( $_GET['cat'] ) ? absint( $_GET['cat'] ) : 0;
+	$query = new WP_Query( array( 'post_type' => 'post', 'post_status' => 'publish', 'posts_per_page' => 100, 'orderby' => 'date', 'order' => 'DESC', 'has_password' => false, 'cat' => $category ) );
 	?>
 	<div class="wrap wsp-admin-page">
 		<h1><?php esc_html_e( 'Share Now / Şimdi paylaş', 'wp-social-publisher' ); ?></h1>
-		<?php wsp_facebook_notice(); wsp_notice(); ?>
+		<?php wsp_facebook_notice(); ?>
 		<?php
 		$preview_id = isset( $_GET['preview'] ) && is_string( $_GET['preview'] ) ? sanitize_text_field( wp_unslash( $_GET['preview'] ) ) : '';
 		$preview = preg_match( '/^[a-zA-Z0-9]{32}$/', $preview_id ) ? get_transient( 'wsp_fb_draft_' . $preview_id ) : false;
@@ -276,10 +304,19 @@ function wsp_share_now_page(): void {
 		<?php endif; ?>
 		<p><?php esc_html_e( 'Hesabınızı ve yazınızı seçin. Önizlemede görsel/metin düzenini kontrol edebilir, son onayla gönderiyi hemen yayımlayabilirsiniz.', 'wp-social-publisher' ); ?></p>
 		<?php if ( ! $platforms ) : ?>
-			<p><?php esc_html_e( 'Önce Accounts sayfasından Facebook veya LinkedIn hesabı bağlayın.', 'wp-social-publisher' ); ?></p>
+			<p><?php esc_html_e( 'Önce Accounts sayfasından en az bir desteklenen platform hesabı bağlayın.', 'wp-social-publisher' ); ?></p>
 		<?php elseif ( ! $query->posts ) : ?>
 			<p><?php esc_html_e( 'Paylaşılabilecek yayımlanmış ve şifresiz yazı bulunamadı.', 'wp-social-publisher' ); ?></p>
 		<?php else : ?>
+			<form method="get" class="wsp-filter-bar">
+				<input type="hidden" name="page" value="wsp-share-now">
+				<label><?php esc_html_e( 'Yazı kategorisi', 'wp-social-publisher' ); ?>
+					<select name="cat"><option value="0"><?php esc_html_e( 'Tüm kategoriler', 'wp-social-publisher' ); ?></option>
+						<?php foreach ( wsp_category_options() as $item ) : ?><option value="<?php echo esc_attr( (string) $item->term_id ); ?>" <?php selected( $category, (int) $item->term_id ); ?>><?php echo esc_html( $item->name ); ?></option><?php endforeach; ?>
+					</select>
+				</label>
+				<?php submit_button( __( 'Yazıları süz', 'wp-social-publisher' ), 'secondary', 'filter_action', false ); ?>
+			</form>
 			<div class="wsp-share-layout">
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wsp-panel wsp-share-form">
 					<h2><?php esc_html_e( 'Paylaşım bilgileri', 'wp-social-publisher' ); ?></h2>
@@ -292,7 +329,7 @@ function wsp_share_now_page(): void {
 					<label class="wsp-field-label" for="wsp-post-id"><?php esc_html_e( 'Yayımlanmış WordPress yazısı', 'wp-social-publisher' ); ?></label>
 					<select id="wsp-post-id" name="post_id" required class="wsp-field-control">
 						<?php foreach ( $query->posts as $post ) : ?>
-							<option value="<?php echo esc_attr( (string) $post->ID ); ?>"><?php echo esc_html( get_the_title( $post ) ); ?></option>
+							<option value="<?php echo esc_attr( (string) $post->ID ); ?>"><?php echo esc_html( get_the_title( $post ) . ' — ' . wsp_post_category_names( $post->ID ) ); ?></option>
 						<?php endforeach; ?>
 					</select>
 					<p class="description"><?php esc_html_e( 'Yazıdaki platforma özel metin varsa o kullanılır; yoksa Templates şablonu uygulanır.', 'wp-social-publisher' ); ?></p>
@@ -301,7 +338,7 @@ function wsp_share_now_page(): void {
 				<aside class="wsp-panel wsp-share-help">
 					<h2><?php esc_html_e( 'Önizleme ve yayınlama', 'wp-social-publisher' ); ?></h2>
 					<p><?php esc_html_e( 'Bir sonraki ekranda hesap adı, paylaşım metni, yazı başlığı ve öne çıkan görselin önizlemesi gösterilir. Onay vermeden hiçbir gönderi yapılmaz.', 'wp-social-publisher' ); ?></p>
-					<p class="description"><?php esc_html_e( 'LinkedIn onayında öne çıkan JPEG/PNG görsel ayrıca gönderiye yüklenir. Facebook bağlantı görselini kendi önizleme kurallarıyla oluşturabilir.', 'wp-social-publisher' ); ?></p>
+					<p class="description"><?php esc_html_e( 'Bağlı hesapların desteklediği medya, gönderi onayından sonra ilgili platformun API’si üzerinden yüklenir.', 'wp-social-publisher' ); ?></p>
 				</aside>
 			</div>
 		<?php endif; ?>
@@ -391,15 +428,7 @@ function wsp_facebook_publish(): void {
 		delete_option( 'wsp_fb_attempt_' . $id );
 		wsp_facebook_redirect( 'wsp-share-now', 'Gönderim kaydı oluşturulamadı. Güvenlik için gönderi yapılmadı.', true );
 	}
-	$result = 'facebook' === $platform
-		? wsp_facebook_request( $account['page_id'] . '/feed', $account['token'], 'POST', array( 'message' => $draft['message'], 'link' => $draft['link'] ) )
-		: wsp_linkedin_publish_post(
-			$account['access_token'],
-			(string) $draft['target_id'],
-			$draft['message'],
-			(int) get_post_thumbnail_id( $post ),
-			$draft['post_title']
-		);
+	$result = wsp_publish_platform_post( $platform, $post, $draft['message'], $draft['link'] );
 	if ( is_wp_error( $result ) ) {
 		$error_message = $result->get_error_message();
 		$status = str_contains( strtolower( $error_message ), 'belirsiz' ) ? 'Belirsiz' : 'Başarısız';

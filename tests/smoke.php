@@ -7,6 +7,7 @@ $GLOBALS['permitted'] = true;
 $GLOBALS['posts'] = array();
 $GLOBALS['enqueued'] = array();
 $GLOBALS['transients'] = array();
+$GLOBALS['cron_events'] = array();
 define( 'MINUTE_IN_SECONDS', 60 );
 define( 'MB_IN_BYTES', 1024 * 1024 );
 
@@ -27,6 +28,7 @@ class WP_Query {
 	public int $max_num_pages = 1;
 	public function __construct( array $args ) {
 		$GLOBALS['last_query'] = $args;
+		$GLOBALS['query_history'][] = $args;
 		$this->posts = $GLOBALS['posts'];
 	}
 }
@@ -60,6 +62,18 @@ function set_transient( $key, $value, $expiry ) { $GLOBALS['transients'][ $key ]
 function get_transient( $key ) { return $GLOBALS['transients'][ $key ] ?? false; }
 function delete_transient( $key ) { unset( $GLOBALS['transients'][ $key ] ); }
 function delete_option( $key ) { unset( $GLOBALS['options'][ $key ] ); return true; }
+function wp_schedule_single_event( $timestamp, $hook, $args = array(), $wp_error = false ) {
+	$GLOBALS['cron_events'][ $hook . ':' . implode( ',', $args ) ] = array( $timestamp, $hook, $args );
+	return true;
+}
+function wp_clear_scheduled_hook( $hook, $args = array() ) {
+	unset( $GLOBALS['cron_events'][ $hook . ':' . implode( ',', $args ) ] );
+	return 0;
+}
+function wp_next_scheduled( $hook, $args = array() ) {
+	$event = $GLOBALS['cron_events'][ $hook . ':' . implode( ',', $args ) ] ?? false;
+	return $event ? $event[0] : false;
+}
 function wp_safe_redirect( $url ) { throw new RuntimeException( 'redirect: ' . $url ); }
 function wp_redirect( $url, $status, $x_redirect_by ) { $GLOBALS['external_redirect'] = $url; throw new RuntimeException( 'external redirect' ); }
 function wp_die( $message ) { throw new RuntimeException( 'die: ' . $message ); }
@@ -87,6 +101,8 @@ function get_the_excerpt( $post ) { return '<p>Özet metni</p>'; }
 function wp_strip_all_tags( $value ) { return strip_tags( $value ); }
 function get_permalink( $post ) { return 'https://example.test/deneme/'; }
 function get_the_tags( $id ) { return array( (object) array( 'name' => 'WordPress' ), (object) array( 'name' => 'Sosyal medya' ) ); }
+function get_the_category( $id ) { return array( (object) array( 'term_id' => 3, 'name' => 'Teknoloji' ) ); }
+function get_categories( $args = array() ) { return array( (object) array( 'term_id' => 3, 'name' => 'Teknoloji' ) ); }
 function get_bloginfo( $show ) { return 'Deneme sitesi'; }
 function __( $value, ...$args ) { return $value; }
 function esc_html__( $value, ...$args ) { return htmlspecialchars( $value, ENT_QUOTES ); }
@@ -289,7 +305,7 @@ $accounts_page = ob_get_clean();
 expect( str_contains( $accounts_page, 'wsp-accounts-grid' ) && str_contains( $accounts_page, 'wsp_facebook_connect' ) && str_contains( $accounts_page, 'wsp_facebook_disconnect' ), 'Facebook bağlantı ve kaldırma formları korunmalı' );
 expect( str_contains( $accounts_page, 'Kayıtlı Sayfa: Sayfa' ) && ! str_contains( $accounts_page, 'secret-token' ), 'Hesap bilgisi belirteç gösterilmeden sunulmalı' );
 expect( str_contains( $accounts_page, 'güncel durumu burada kontrol edilmez' ), 'Bağlantı durumu güncel olarak sunulmamalı' );
-foreach ( array( 'x', 'linkedin' ) as $platform ) {
+foreach ( array( 'x', 'linkedin', 'instagram', 'reddit', 'pinterest' ) as $platform ) {
 	$_GET['platform'] = $platform;
 	ob_start();
 	wsp_accounts_page();
@@ -298,14 +314,16 @@ foreach ( array( 'x', 'linkedin' ) as $platform ) {
 	expect( str_contains( $accounts_page, 'wsp_oauth_save_app' ) && ! str_contains( $accounts_page, 'wsp_facebook_connect' ), 'Platforma özel OAuth formu olmalı: ' . $platform );
 	expect( ! str_contains( $accounts_page, 'wsp_oauth_start' ), 'Uygulama bilgileri olmadan giriş başlamamalı: ' . $platform );
 }
-foreach ( array( 'instagram', 'reddit', 'pinterest' ) as $platform ) {
-	$_GET['platform'] = $platform;
-	ob_start();
-	wsp_accounts_page();
-	$accounts_page = ob_get_clean();
-	expect( str_contains( $accounts_page, wsp_platforms()[ $platform ] ) && str_contains( $accounts_page, 'Resmi hesap bağlantısı desteklenmiyor' ), 'Yeni platform için bağlantı henüz desteklenmediği belirtilmeli: ' . $platform );
-	expect( ! str_contains( $accounts_page, 'page_token' ) && ! str_contains( $accounts_page, 'client_secret' ), 'Desteklenmeyen platform için kimlik bilgisi alınmamalı' );
-}
+$_GET['platform'] = 'reddit';
+ob_start();
+wsp_accounts_page();
+$reddit_page = ob_get_clean();
+expect( str_contains( $reddit_page, 'name="subreddit"' ) && array( 'identity', 'submit' ) === wsp_oauth_providers()['reddit']['scopes'], 'Reddit bağlantısı hedef subreddit ve OAuth izinlerini sunmalı' );
+$_GET['platform'] = 'pinterest';
+ob_start();
+wsp_accounts_page();
+$pinterest_page = ob_get_clean();
+expect( str_contains( $pinterest_page, 'name="board_id"' ) && in_array( 'pins:write', wsp_oauth_providers()['pinterest']['scopes'], true ), 'Pinterest bağlantısı pano ve Pin yazma izinlerini sunmalı' );
 $_GET['platform'] = 'gecersiz';
 $GLOBALS['ssl'] = false;
 ob_start();
@@ -351,6 +369,21 @@ expect( 'x' === $oauth_state['platform'] && 7 === $oauth_state['user_id'], 'OAut
 $verifier = wsp_decrypt_secret( $oauth_state['verifier'] );
 expect( ! is_wp_error( $verifier ) && $verifier !== $oauth_state['verifier'], 'PKCE verifier transient içinde şifreli saklanmalı' );
 expect( hash_equals( $authorize['code_challenge'], rtrim( strtr( base64_encode( hash( 'sha256', $verifier, true ) ), '+/', '-_' ), '=' ) ), 'X PKCE challenge verifier ile eşleşmeli' );
+
+$GLOBALS['options']['wsp_oauth_apps']['reddit'] = array(
+	'client_id'     => 'reddit-client',
+	'client_secret' => wsp_encrypt_secret( 'reddit-secret' ),
+);
+$_POST = array( 'platform' => 'reddit' );
+try {
+	wsp_oauth_start();
+	expect( false, 'Reddit OAuth yönlendirmesi başlamalı' );
+} catch ( RuntimeException $error ) {
+	expect( 'external redirect' === $error->getMessage(), 'Kullanıcı Reddit OAuth sayfasına yönlendirilmeli' );
+}
+$reddit_authorize = array();
+parse_str( (string) parse_url( $GLOBALS['external_redirect'], PHP_URL_QUERY ), $reddit_authorize );
+expect( 'permanent' === $reddit_authorize['duration'], 'Reddit OAuth kalıcı izin istemeli' );
 
 $_SERVER['PHP_SELF'] = '/wp-admin/admin-post.php';
 $_GET = array( 'state' => $authorize['state'], 'code' => 'test-authorization-code' );
@@ -411,6 +444,24 @@ try {
 }
 expect( 'linkedin-client' === $GLOBALS['token_request'][1]['body']['client_id'] && 'linkedin-secret' === $GLOBALS['token_request'][1]['body']['client_secret'], 'LinkedIn token isteği uygulama bilgilerini kullanmalı' );
 expect( 'li-123' === get_option( 'wsp_oauth_accounts' )['linkedin']['profile']['id'], 'LinkedIn profili doğrulanıp kaydedilmeli' );
+expect( array( 'instagram_business_basic', 'instagram_business_content_publish' ) === wsp_oauth_providers()['instagram']['scopes'], 'Instagram OAuth yalnızca temel hesap ve yayınlama izinlerini istemeli' );
+expect( array( 'identity', 'submit' ) === wsp_oauth_providers()['reddit']['scopes'] && array( 'user_accounts:read', 'boards:read', 'pins:write' ) === wsp_oauth_providers()['pinterest']['scopes'], 'Reddit ve Pinterest OAuth yayınlama izinleri tanımlı olmalı' );
+foreach ( array( 'instagram' => array( 'id' => 'ig-123', 'name' => 'blogger', 'username' => 'blogger' ), 'reddit' => array( 'id' => 'rd-123', 'name' => 'reddit-user', 'username' => 'reddit-user' ), 'pinterest' => array( 'id' => 'pin-user', 'name' => 'pin-user', 'username' => 'pin-user' ) ) as $platform => $expected_profile ) {
+	$GLOBALS['profile_response'] = array( 'code' => 200, 'body' => json_encode( 'instagram' === $platform ? array( 'user_id' => 'ig-123', 'username' => 'blogger' ) : ( 'reddit' === $platform ? array( 'id' => 'rd-123', 'name' => 'reddit-user' ) : array( 'username' => 'pin-user' ) ) ) );
+	expect( $expected_profile === wsp_oauth_profile( $platform, 'test-access-token' ), $platform . ' hesabı profili doğrulanmalı' );
+}
+$oauth_accounts = get_option( 'wsp_oauth_accounts' );
+foreach ( array( 'instagram', 'reddit', 'pinterest' ) as $platform ) {
+	$oauth_accounts[ $platform ] = array( 'profile' => array( 'id' => $platform . '-123', 'name' => $platform . '-test', 'username' => $platform . '-test' ), 'access_token' => wsp_encrypt_secret( $platform . '-token' ), 'refresh_token' => '', 'expires_at' => 0 );
+}
+update_option( 'wsp_oauth_accounts', $oauth_accounts );
+$connected_share_platforms = wsp_shareable_platforms();
+expect( array( 'x', 'linkedin', 'facebook', 'instagram', 'reddit', 'pinterest' ) === array_keys( $connected_share_platforms ), 'Share Now bağlı hesapları platform sırasıyla otomatik göstermeli' );
+$_GET = array( 'cat' => '3' );
+ob_start();
+wsp_share_now_page();
+$share_picker = ob_get_clean();
+expect( str_contains( $share_picker, 'name="cat"' ) && str_contains( $share_picker, 'Deneme başlığı — Teknoloji' ) && 3 === $GLOBALS['last_query']['cat'], 'Share Now yazı listesi kategorilerle süzülebilmeli' );
 $temporary_image = tempnam( sys_get_temp_dir(), 'wsp-image-' );
 $GLOBALS['attached_file'] = $temporary_image . '.jpg';
 rename( $temporary_image, $GLOBALS['attached_file'] );
@@ -474,6 +525,7 @@ ob_start();
 wsp_auto_post_page();
 $preselected_auto_post_page = ob_get_clean();
 expect( str_contains( $preselected_auto_post_page, 'value="2026-11-25T09:00"' ), 'Takvimden seçilen gün otomatik plan formuna taşınmalı' );
+expect( str_contains( $preselected_auto_post_page, 'Teknoloji' ) && str_contains( $preselected_auto_post_page, 'Son planlanan 10 gönderi' ), 'Autopost kategori bilgisi ve son 10 planı göstermeli' );
 $GLOBALS['password_override'] = str_repeat( 'c', 32 );
 $_POST = array( 'platform' => 'linkedin', 'post_id' => '12' );
 try {
@@ -527,7 +579,9 @@ expect( '2026-12-01T00:00' === $GLOBALS['last_query']['meta_query'][0][1]['value
 ob_start();
 wsp_schedules_page();
 $schedule = ob_get_clean();
-expect( str_contains( $schedule, '2026-11-18 09:30' ) && str_contains( $schedule, 'Deneme başlığı' ), 'Plan listesi tarih ve yazıyı göstermeli' );
+expect( str_contains( $schedule, '2026-11-18 09:30' ) && str_contains( $schedule, 'Deneme başlığı' ) && str_contains( $schedule, 'Teknoloji' ), 'Plan listesi tarih, yazı ve kategoriyi göstermeli' );
+expect( str_contains( $schedule, 'date_from' ) && str_contains( $schedule, 'date_to' ) && str_contains( $schedule, 'name="cat"' ), 'Plan listesi kategori ve tarih filtreleri sunmalı' );
+$GLOBALS['options']['wsp_oauth_accounts']['linkedin'] = array( 'access_token' => 'encrypted-token', 'profile' => array( 'id' => 'li-123', 'name' => 'LinkedIn Tester' ) );
 $_POST = array( 'post_id' => '12', 'platforms' => array( 'linkedin', 'facebook' ), 'scheduled_at' => '2026-11-20T14:45' );
 try {
 	wsp_save_auto_post();
@@ -535,5 +589,16 @@ try {
 	expect( str_starts_with( $error->getMessage(), 'redirect:' ), 'Başarılı plan kaydı otomatik plan sayfasına yönlendirmeli' );
 }
 expect( '2026-11-20T14:45' === get_post_meta( 12, '_wsp_scheduled_at', true ) && '1' === get_post_meta( 12, '_wsp_linkedin_enabled', true ) && '1' === get_post_meta( 12, '_wsp_facebook_enabled', true ), 'WP Auto Post seçilen yazı/platform/tarihi WordPress meta alanlarına kaydetmeli' );
+expect( false !== wp_next_scheduled( 'wsp_publish_scheduled_post', array( 12 ) ) && 'scheduled' === get_post_meta( 12, '_wsp_schedule_state', true ), 'Kaydedilen paylaşım WP-Cron kuyruğuna eklenmeli' );
+$GLOBALS['meta'][12]['_wsp_scheduled_at'] = ( new DateTimeImmutable( 'now', wp_timezone() ) )->modify( '-5 minutes' )->format( 'Y-m-d\TH:i' );
+$GLOBALS['meta'][12]['_wsp_facebook_enabled'] = '1';
+$GLOBALS['meta'][12]['_wsp_linkedin_enabled'] = '0';
+$GLOBALS['response_queue'] = array( array( 'code' => 200, 'body' => '{"id":"fb-scheduled"}' ) );
+$GLOBALS['test_post'] = $post;
+wsp_dispatch_scheduled_post( 12 );
+$scheduled_log_count = count( get_option( 'wsp_delivery_logs' ) );
+expect( 'completed' === get_post_meta( 12, '_wsp_schedule_state', true ) && 'Başarılı' === get_option( 'wsp_delivery_logs' )[0]['status'], 'WP-Cron planlanan saatte bağlı hesaba gerçek gönderim yapıp sonucu kaydetmeli' );
+wsp_dispatch_scheduled_post( 12 );
+expect( $scheduled_log_count === count( get_option( 'wsp_delivery_logs' ) ), 'Yinelenen WP-Cron tetiklemesi ikinci kez paylaşım yapmamalı' );
 
 echo "Smoke checks passed.\n";

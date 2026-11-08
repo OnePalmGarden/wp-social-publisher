@@ -22,6 +22,31 @@ function wsp_oauth_providers(): array {
 			'scopes'        => array( 'openid', 'profile', 'w_member_social' ),
 			'profile'       => 'linkedin',
 		),
+		'instagram' => array(
+			'name'          => 'Instagram',
+			'authorize_url' => 'https://www.instagram.com/oauth/authorize',
+			'token_url'     => 'https://api.instagram.com/oauth/access_token',
+			'profile_url'   => 'https://graph.instagram.com/v24.0/me?fields=user_id%2Cusername',
+			'scopes'        => array( 'instagram_business_basic', 'instagram_business_content_publish' ),
+			'profile'       => 'instagram',
+		),
+		'reddit' => array(
+			'name'          => 'Reddit',
+			'authorize_url' => 'https://www.reddit.com/api/v1/authorize',
+			'token_url'     => 'https://www.reddit.com/api/v1/access_token',
+			'profile_url'   => 'https://oauth.reddit.com/api/v1/me',
+			'scopes'        => array( 'identity', 'submit' ),
+			'profile'       => 'reddit',
+			'duration'      => 'permanent',
+		),
+		'pinterest' => array(
+			'name'          => 'Pinterest',
+			'authorize_url' => 'https://www.pinterest.com/oauth/',
+			'token_url'     => 'https://api.pinterest.com/v5/oauth/token',
+			'profile_url'   => 'https://api.pinterest.com/v5/user_account',
+			'scopes'        => array( 'user_accounts:read', 'boards:read', 'pins:write' ),
+			'profile'       => 'pinterest',
+		),
 	);
 }
 
@@ -67,7 +92,29 @@ function wsp_oauth_account( string $platform ) {
 			return $account['refresh_token'];
 		}
 	}
-	if ( 'x' === $platform && ! empty( $account['refresh_token'] ) && ! empty( $account['expires_at'] ) && (int) $account['expires_at'] <= time() + 60 ) {
+	if ( 'instagram' === $platform && ! empty( $account['expires_at'] ) && (int) $account['expires_at'] <= time() + 7 * 86400 ) {
+		$response = wp_remote_get(
+			'https://graph.instagram.com/refresh_access_token?' . http_build_query( array( 'grant_type' => 'ig_refresh_token', 'access_token' => $account['access_token'] ), '', '&', PHP_QUERY_RFC3986 ),
+			array( 'timeout' => 20, 'redirection' => 0, 'headers' => array( 'Accept' => 'application/json' ) )
+		);
+		$data = is_wp_error( $response ) ? array() : json_decode( wp_remote_retrieve_body( $response ), true );
+		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) || ! is_array( $data ) || empty( $data['access_token'] ) || ! is_string( $data['access_token'] ) ) {
+			return new WP_Error( 'instagram_refresh_failed', 'Instagram tokenı yenilenemedi. Accounts sayfasından hesabı yeniden bağlayın.' );
+		}
+		$encrypted = wsp_encrypt_secret( $data['access_token'] );
+		if ( is_wp_error( $encrypted ) ) {
+			return $encrypted;
+		}
+		$account['access_token'] = $encrypted;
+		$account['expires_at'] = isset( $data['expires_in'] ) && is_numeric( $data['expires_in'] ) ? time() + (int) $data['expires_in'] : 0;
+		$accounts[ $platform ] = $account;
+		update_option( 'wsp_oauth_accounts', $accounts, false );
+		if ( get_option( 'wsp_oauth_accounts' ) !== $accounts ) {
+			return new WP_Error( 'instagram_refresh_storage', 'Yenilenen Instagram tokenı kaydedilemedi.' );
+		}
+		$account['access_token'] = $data['access_token'];
+	}
+	if ( in_array( $platform, array( 'x', 'reddit', 'pinterest' ), true ) && ! empty( $account['refresh_token'] ) && ! empty( $account['expires_at'] ) && (int) $account['expires_at'] <= time() + 60 ) {
 		$app = wsp_oauth_app( $platform );
 		if ( is_wp_error( $app ) ) {
 			return $app;
@@ -280,6 +327,25 @@ function wsp_oauth_profile( string $platform, string $access_token ) {
 		}
 		return array( 'id' => $id, 'name' => $name, 'username' => $username );
 	}
+	if ( 'reddit' === $platform ) {
+		if ( empty( $data['id'] ) || ! is_string( $data['id'] ) || empty( $data['name'] ) || ! is_string( $data['name'] ) ) {
+			return new WP_Error( 'profile_invalid', 'Reddit hesabı yanıtında gerekli profil bilgileri yok.' );
+		}
+		return array( 'id' => $data['id'], 'name' => $data['name'], 'username' => $data['name'] );
+	}
+	if ( 'pinterest' === $platform ) {
+		if ( empty( $data['username'] ) || ! is_string( $data['username'] ) ) {
+			return new WP_Error( 'profile_invalid', 'Pinterest hesabı yanıtında gerekli profil bilgileri yok.' );
+		}
+		return array( 'id' => $data['username'], 'name' => $data['username'], 'username' => $data['username'] );
+	}
+	if ( 'instagram' === $platform ) {
+		$id = isset( $data['user_id'] ) && is_scalar( $data['user_id'] ) ? (string) $data['user_id'] : ( isset( $data['id'] ) && is_scalar( $data['id'] ) ? (string) $data['id'] : '' );
+		if ( '' === $id || empty( $data['username'] ) || ! is_string( $data['username'] ) ) {
+			return new WP_Error( 'profile_invalid', 'Instagram hesabı yanıtında gerekli profil bilgileri yok.' );
+		}
+		return array( 'id' => $id, 'name' => $data['username'], 'username' => $data['username'] );
+	}
 	if ( empty( $data['sub'] ) || ! is_string( $data['sub'] ) ) {
 		return new WP_Error( 'profile_invalid', 'LinkedIn hesabı yanıtında gerekli profil bilgileri yok.' );
 	}
@@ -322,6 +388,35 @@ function wsp_oauth_test_form( string $platform ): void {
 		<?php submit_button( __( 'Hesap bağlantısını kaldır', 'wp-social-publisher' ), 'secondary', 'submit', false ); ?>
 	</form>
 	<?php
+}
+
+function wsp_pinterest_boards( string $access_token ) {
+	$cache_key = 'wsp_pinterest_boards_' . substr( hash( 'sha256', $access_token ), 0, 20 );
+	$cached = get_transient( $cache_key );
+	if ( is_array( $cached ) ) {
+		return $cached;
+	}
+	$response = wp_remote_get(
+		'https://api.pinterest.com/v5/boards?page_size=100',
+		array(
+			'timeout'     => 20,
+			'redirection' => 0,
+			'headers'     => array( 'Authorization' => 'Bearer ' . $access_token, 'Accept' => 'application/json' ),
+		)
+	);
+	if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
+		return new WP_Error( 'pinterest_boards_failed', 'Pinterest panoları yüklenemedi. boards:read iznini ve hesabı kontrol edin.' );
+	}
+	$data = json_decode( wp_remote_retrieve_body( $response ), true );
+	$boards = isset( $data['items'] ) && is_array( $data['items'] ) ? $data['items'] : array();
+	$valid_boards = array();
+	foreach ( $boards as $board ) {
+		if ( is_array( $board ) && isset( $board['id'], $board['name'] ) && is_string( $board['id'] ) && is_string( $board['name'] ) ) {
+			$valid_boards[] = array( 'id' => $board['id'], 'name' => sanitize_text_field( $board['name'] ) );
+		}
+	}
+	set_transient( $cache_key, $valid_boards, 10 * MINUTE_IN_SECONDS );
+	return $valid_boards;
 }
 
 function wsp_render_accounts_page(): void {
@@ -374,10 +469,6 @@ function wsp_render_accounts_page(): void {
 					<?php endif; ?>
 				<?php elseif ( isset( $oauth_platforms[ $platform ] ) ) : ?>
 					<?php wsp_render_oauth_account( $platform, $oauth_platforms[ $platform ], $apps, $oauth_accounts ); ?>
-				<?php elseif ( in_array( $platform, array( 'instagram', 'reddit', 'pinterest' ), true ) ) : ?>
-					<h2 id="wsp-account-heading"><?php echo esc_html( $platforms[ $platform ] ); ?></h2>
-					<p><strong><?php esc_html_e( 'Resmi hesap bağlantısı desteklenmiyor', 'wp-social-publisher' ); ?></strong></p>
-					<p><?php esc_html_e( 'Bu platform şu anda şablon ve plan seçimi içindir; resmi hesap bağlantısı ve gönderi API desteği henüz eklenmedi. Bu eklenti parola toplamaz ve resmi olmayan tarayıcı otomasyonuyla giriş yapmaz.', 'wp-social-publisher' ); ?></p>
 				<?php endif; ?>
 			</section>
 		</div>
@@ -393,6 +484,17 @@ function wsp_render_oauth_account( string $platform, array $provider, array $app
 	$profile_identifier = ! empty( $account['profile']['username'] )
 		? '@' . $account['profile']['username']
 		: ( $account['profile']['id'] ?? '' );
+	$boards = array();
+	$boards_error = '';
+	if ( 'pinterest' === $platform && $has_account ) {
+		$connected = wsp_oauth_account( $platform );
+		$boards_result = is_wp_error( $connected ) ? $connected : wsp_pinterest_boards( $connected['access_token'] );
+		if ( is_wp_error( $boards_result ) ) {
+			$boards_error = $boards_result->get_error_message();
+		} else {
+			$boards = $boards_result;
+		}
+	}
 	?>
 	<h2 id="wsp-account-heading"><?php echo esc_html( $provider['name'] ); ?></h2>
 	<p><?php esc_html_e( 'Bu platform için ayrı bir geliştirici uygulaması gerekir. Uygulama bilgileri bu sitede saklanır; kullanıcı girişi platformun resmi OAuth sayfasında yapılır.', 'wp-social-publisher' ); ?></p>
@@ -412,6 +514,15 @@ function wsp_render_oauth_account( string $platform, array $provider, array $app
 			<p><label for="wsp-client-secret"><?php esc_html_e( 'Client Secret', 'wp-social-publisher' ); ?></label><br>
 				<input id="wsp-client-secret" name="client_secret" type="password" class="regular-text" autocomplete="new-password" <?php echo '' === $secret ? 'required' : ''; ?>>
 				<span class="description"><?php echo '' !== $secret ? esc_html__( 'Gizli anahtar kayıtlı. Değiştirmek istemiyorsanız boş bırakın.', 'wp-social-publisher' ) : esc_html__( 'Geliştirici uygulamanızdan alınır; sohbet veya herkese açık kodda paylaşmayın.', 'wp-social-publisher' ); ?></span></p>
+			<?php if ( 'reddit' === $platform ) : ?>
+				<p><label for="wsp-subreddit"><?php esc_html_e( 'Hedef subreddit', 'wp-social-publisher' ); ?></label><br>
+					<input id="wsp-subreddit" name="subreddit" type="text" class="regular-text" value="<?php echo esc_attr( isset( $app['subreddit'] ) && is_string( $app['subreddit'] ) ? $app['subreddit'] : '' ); ?>" placeholder="wordpress"></p>
+			<?php elseif ( 'pinterest' === $platform ) : ?>
+				<p><label for="wsp-board-id"><?php esc_html_e( 'Pinterest pano kimliği', 'wp-social-publisher' ); ?></label><br>
+					<input id="wsp-board-id" name="board_id" type="text" class="regular-text" list="wsp-pinterest-boards" value="<?php echo esc_attr( isset( $app['board_id'] ) && is_string( $app['board_id'] ) ? $app['board_id'] : '' ); ?>" placeholder="<?php esc_attr_e( 'Bağladıktan sonra panoyu seçin veya kimliğini girin', 'wp-social-publisher' ); ?>">
+					<datalist id="wsp-pinterest-boards"><?php foreach ( $boards as $board ) : ?><option value="<?php echo esc_attr( $board['id'] ); ?>" label="<?php echo esc_attr( $board['name'] ); ?>"></option><?php endforeach; ?></datalist>
+					<?php if ( '' !== $boards_error ) : ?><span class="description"><?php echo esc_html( $boards_error ); ?></span><?php elseif ( $has_account && ! $boards ) : ?><span class="description"><?php esc_html_e( 'Bağlı hesapta pano bulunamadı; pano kimliğini elle girebilirsiniz.', 'wp-social-publisher' ); ?></span><?php endif; ?></p>
+			<?php endif; ?>
 			<p><strong><?php esc_html_e( 'OAuth Redirect URI', 'wp-social-publisher' ); ?></strong><br>
 				<code><?php echo esc_html( wsp_oauth_callback_url( $platform ) ); ?></code><br>
 				<span class="description"><?php esc_html_e( 'Bu adresi geliştirici uygulamanızdaki tam eşleşen Redirect / Callback URL listesine ekleyin.', 'wp-social-publisher' ); ?></span></p>
@@ -440,9 +551,18 @@ function wsp_render_oauth_account( string $platform, array $provider, array $app
 	<?php if ( 'x' === $platform ) : ?>
 		<p class="description"><?php esc_html_e( 'X Developer Portal’da Web App/Confidential Client türünde OAuth 2.0 Authorization Code Flow with PKCE kurun. Callback adresini aynen kopyalayın; users.read, tweet.read, tweet.write ve offline.access izinlerini etkinleştirin. API erişimi ve yazma izni uygulamanızın planına bağlı olabilir.', 'wp-social-publisher' ); ?></p>
 		<p><a href="https://developer.x.com/en/portal/dashboard" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'X Developer Portal’ı aç', 'wp-social-publisher' ); ?></a></p>
-	<?php else : ?>
+	<?php elseif ( 'linkedin' === $platform ) : ?>
 		<p class="description"><?php esc_html_e( 'LinkedIn Developer Portal’da uygulama oluşturup burada gösterilen callback adresini Authorized redirect URLs listesine ekleyin. Giriş için Sign In with LinkedIn using OpenID Connect; gönderi izni için ayrıca Share on LinkedIn ürününü etkinleştirin. Ürün erişimi LinkedIn onayı gerektirebilir.', 'wp-social-publisher' ); ?></p>
 		<p><a href="https://www.linkedin.com/developers/apps" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'LinkedIn Developer Portal’ı aç', 'wp-social-publisher' ); ?></a></p>
+	<?php elseif ( 'instagram' === $platform ) : ?>
+		<p class="description"><?php esc_html_e( 'Instagram API with Instagram Login kullanan bir Professional (Creator/Business) hesabı ve instagram_business_basic ile instagram_business_content_publish izinleri gerekir. Yayımlanacak görselin herkese açık HTTPS URL’si olmalıdır.', 'wp-social-publisher' ); ?></p>
+		<p><a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Meta for Developers’ı aç', 'wp-social-publisher' ); ?></a></p>
+	<?php elseif ( 'reddit' === $platform ) : ?>
+		<p class="description"><?php esc_html_e( 'Reddit uygulamasını web app olarak oluşturun, callback adresini kaydedin ve API kurallarına uyun. Bu eklenti gönderileri seçilen subreddit’e kullanıcı hesabınız adına yollar.', 'wp-social-publisher' ); ?></p>
+		<p><a href="https://www.reddit.com/prefs/apps" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Reddit uygulama ayarlarını aç', 'wp-social-publisher' ); ?></a></p>
+	<?php else : ?>
+		<p class="description"><?php esc_html_e( 'Pinterest Developer uygulamasında pins:write, boards:read ve user_accounts:read izinlerini etkinleştirip callback adresini kaydedin. Gönderi için bir pano kimliği gerekir.', 'wp-social-publisher' ); ?></p>
+		<p><a href="https://developers.pinterest.com/apps/" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Pinterest Developer’ı aç', 'wp-social-publisher' ); ?></a></p>
 	<?php endif; ?>
 <?php
 }
@@ -487,7 +607,12 @@ function wsp_oauth_save_app(): void {
 	}
 	$client_id = sanitize_text_field( $client_id );
 	$client_id_changed = isset( $existing['client_id'] ) && $existing['client_id'] !== $client_id;
-	$apps[ $platform ] = array( 'client_id' => $client_id, 'client_secret' => $encrypted );
+	$apps[ $platform ] = array(
+		'client_id'     => $client_id,
+		'client_secret' => $encrypted,
+		'subreddit'     => 'reddit' === $platform && isset( $_POST['subreddit'] ) && is_string( $_POST['subreddit'] ) ? sanitize_text_field( wp_unslash( $_POST['subreddit'] ) ) : ( $existing['subreddit'] ?? '' ),
+		'board_id'      => 'pinterest' === $platform && isset( $_POST['board_id'] ) && is_string( $_POST['board_id'] ) ? sanitize_text_field( wp_unslash( $_POST['board_id'] ) ) : ( $existing['board_id'] ?? '' ),
+	);
 	update_option( 'wsp_oauth_apps', $apps, false );
 	if ( get_option( 'wsp_oauth_apps' ) !== $apps ) {
 		wsp_oauth_redirect( $platform, 'Uygulama bilgileri kaydedilemedi.', true );
@@ -538,6 +663,9 @@ function wsp_oauth_start(): void {
 		'scope'         => implode( ' ', $providers[ $platform ]['scopes'] ),
 		'state'         => $state,
 	);
+	if ( isset( $providers[ $platform ]['duration'] ) ) {
+		$arguments['duration'] = $providers[ $platform ]['duration'];
+	}
 	if ( 'x' === $platform ) {
 		$arguments['code_challenge'] = rtrim( strtr( base64_encode( hash( 'sha256', $verifier, true ) ), '+/', '-_' ), '=' );
 		$arguments['code_challenge_method'] = 'S256';
@@ -551,12 +679,18 @@ add_action( 'admin_post_wsp_oauth_start', 'wsp_oauth_start' );
 function wsp_oauth_token_request( string $platform, array $body, array $app ) {
 	$providers = wsp_oauth_providers();
 	$headers = array( 'Accept' => 'application/json' );
-	if ( 'x' === $platform ) {
+	if ( in_array( $platform, array( 'x', 'reddit', 'pinterest' ), true ) ) {
 		$headers['Authorization'] = 'Basic ' . base64_encode( $app['client_id'] . ':' . $app['client_secret'] );
 		$body['client_id'] = $app['client_id'];
+		if ( 'x' !== $platform ) {
+			unset( $body['client_secret'] );
+		}
 	} else {
 		$body['client_id'] = $app['client_id'];
 		$body['client_secret'] = $app['client_secret'];
+	}
+	if ( 'reddit' === $platform ) {
+		$headers['User-Agent'] = 'WP Social Publisher/0.9';
 	}
 	$response = wp_remote_post(
 		$providers[ $platform ]['token_url'],
@@ -573,6 +707,25 @@ function wsp_oauth_token_request( string $platform, array $body, array $app ) {
 	$data = json_decode( wp_remote_retrieve_body( $response ), true );
 	if ( 200 !== wp_remote_retrieve_response_code( $response ) || ! is_array( $data ) || empty( $data['access_token'] ) || ! is_string( $data['access_token'] ) ) {
 		return new WP_Error( 'oauth_token', 'Platform girişini tamamlayamadı. Redirect URI, uygulama bilgileri, ürün erişimi ve izinleri kontrol edin.' );
+	}
+	return $data;
+}
+
+function wsp_instagram_extend_token( string $short_lived_token, array $app ) {
+	$url = 'https://graph.instagram.com/access_token?' . http_build_query(
+		array(
+			'grant_type'   => 'ig_exchange_token',
+			'client_secret' => $app['client_secret'],
+			'access_token' => $short_lived_token,
+		),
+		'',
+		'&',
+		PHP_QUERY_RFC3986
+	);
+	$response = wp_remote_get( $url, array( 'timeout' => 20, 'redirection' => 0, 'headers' => array( 'Accept' => 'application/json' ) ) );
+	$data = is_wp_error( $response ) ? array() : json_decode( wp_remote_retrieve_body( $response ), true );
+	if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) || ! is_array( $data ) || empty( $data['access_token'] ) || ! is_string( $data['access_token'] ) ) {
+		return new WP_Error( 'instagram_token_exchange', 'Instagram uzun süreli tokenı alınamadı. Instagram Login ayarlarını ve izinleri kontrol edin.' );
 	}
 	return $data;
 }
@@ -623,6 +776,12 @@ function wsp_oauth_callback() {
 	if ( is_wp_error( $tokens ) ) {
 		wsp_oauth_redirect( $platform, $tokens->get_error_message(), true );
 	}
+	if ( 'instagram' === $platform ) {
+		$tokens = wsp_instagram_extend_token( $tokens['access_token'], $app );
+		if ( is_wp_error( $tokens ) ) {
+			wsp_oauth_redirect( $platform, $tokens->get_error_message(), true );
+		}
+	}
 	$profile = wsp_oauth_profile( $platform, $tokens['access_token'] );
 	if ( is_wp_error( $profile ) ) {
 		wsp_oauth_redirect( $platform, $profile->get_error_message(), true );
@@ -644,7 +803,7 @@ function wsp_oauth_callback() {
 	if ( get_option( 'wsp_oauth_accounts' ) !== $accounts ) {
 		wsp_oauth_redirect( $platform, 'Hesap doğrulandı ancak kaydedilemedi.', true );
 	}
-	wsp_oauth_redirect( $platform, sprintf( 'Giriş doğrulandı: %s (%s). Bu test, daha sonra gönderi paylaşma iznini garanti etmez.', $profile['name'], 'x' === $platform ? '@' . $profile['username'] : $profile['id'] ) );
+	wsp_oauth_redirect( $platform, sprintf( 'Giriş doğrulandı: %s (%s).', $profile['name'], ! empty( $profile['username'] ) ? '@' . $profile['username'] : $profile['id'] ) );
 }
 
 function wsp_oauth_maybe_handle_callback(): void {
@@ -668,7 +827,7 @@ function wsp_oauth_test(): void {
 	if ( is_wp_error( $profile ) ) {
 		wsp_oauth_redirect( $platform, $profile->get_error_message(), true );
 	}
-	wsp_oauth_redirect( $platform, 'Bağlantı testi başarılı: ' . $profile['name'] . ( 'x' === $platform ? ' (@' . $profile['username'] . ')' : '' ) );
+	wsp_oauth_redirect( $platform, 'Bağlantı testi başarılı: ' . $profile['name'] . ( ! empty( $profile['username'] ) ? ' (@' . $profile['username'] . ')' : '' ) );
 }
 add_action( 'admin_post_wsp_oauth_test', 'wsp_oauth_test' );
 
