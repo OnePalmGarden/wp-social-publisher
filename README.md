@@ -1,27 +1,41 @@
 # WP Social Publisher
 
-WordPress yazılarınız için Facebook, Instagram, Medium ve Substack paylaşım taslaklarını ayrı ayrı hazırlamanızı sağlayan eklenti.
+WordPress yazıları için Facebook, Instagram, LinkedIn, Medium ve Substack paylaşım taslakları hazırlayan deneme eklentisi.
 
-## İlk deneme sürümü (0.1.0)
+## Önemli: Bu bir önizleme sürümüdür
 
-Bu sürüm, yazı düzenleme ekranına **Sosyal paylaşım taslağı** kutusu ekler. Her platformu ayrı seçebilir, platforma özel paylaşım metni ve planlanan tarih/saat girebilirsiniz. Bu bilgiler yazıyla birlikte WordPress'te saklanır.
+Sürüm 0.2.0 hesaplara bağlanmaz, paylaşım yapmaz ve otomatik gönderim kuyruğu çalıştırmaz. Plan tarihi yalnızca WordPress'te saklanır ve takvimde gösterilir. Hesaplar, otomatik paylaşım, şimdi paylaş ve kayıtlar sayfaları gelecekteki özellikler için bilgilendirme ekranlarıdır. Şifre veya erişim anahtarı istemezler.
 
-> Bu ilk deneme sürümü sosyal hesaplara bağlanmaz ve platformlara otomatik gönderim yapmaz. Facebook/Instagram bağlantısı ve Medium/Substack için uygun resmi yayınlama yöntemleri sonraki aşamalarda ele alınacaktır.
+## Kurulum ve güncelleme
 
-## Kurulum
-
-1. Bu depoda **Code → Download ZIP** seçeneğiyle ZIP dosyasını indirin.
+1. GitHub deposunda **Code → Download ZIP** seçeneğiyle ZIP dosyasını indirin.
 2. WordPress yönetiminde **Eklentiler → Yeni Eklenti Ekle → Eklenti Yükle** yolunu açın.
-3. İndirdiğiniz ZIP dosyasını seçip **Şimdi Yükle**, ardından **Etkinleştir** düğmesine basın.
-4. **Yazılar → Yeni yazı ekle** ekranında **Sosyal paylaşım taslağı** kutusunu bulun.
-5. Platformları seçin, ayrı metinleri ve isterseniz planlanan zamanı girin; yazıyı kaydedin.
+3. ZIP dosyasını seçip **Şimdi Yükle** düğmesine basın. Önceki sürüm yüklüyse, WordPress'in güncelleme onayı çıkarsa mevcut sürümü değiştirin.
+4. Eklentiyi etkinleştirin. Yönetim panelinin sol menüsünde **Social Publisher** görünür.
 
-WordPress kutusu görünmüyorsa düzenleyici ekranının sağ üstündeki **Tercihler / Panel** bölümünden kutunun açık olduğunu kontrol edin.
+Güncellemeden önce sitenizin yedeğini alın. Mevcut yazıların platform seçimleri, özel metinleri ve tarihleri korunur. WordPress ZIP'i önceki sürümle aynı eklenti olarak tanımazsa ikinci bir kopyayı etkinleştirmeyin: önceki kopyayı devre dışı bırakın ve sunucunuzun yedekleme/güncelleme yöntemini kullanın.
+
+## Şablonlar ve yazı önizlemesi
+
+**Social Publisher → Templates** ekranında her platform için varsayılan metni düzenleyin. Şu yer tutucular desteklenir:
+
+| Yer tutucu | Yazıdan alınan bilgi |
+| --- | --- |
+| `{title}` | Başlık |
+| `{excerpt}` | Özet; WordPress'in varsayılan özet davranışı kullanılır |
+| `{url}` | Yazı bağlantısı |
+| `{tags}` | Yazı etiketleri, virgülle ayrılmış olarak; otomatik `#` eklenmez |
+
+Bir yazının düzenleme ekranındaki **Sosyal paylaşım taslağı** kutusunda hedef platformları seçin. Yazıya özel metin alanı boşsa o platformun varsayılan şablonu, doluysa bu özel metin kullanılır. Özel metin de aynı yer tutucuları destekler. Önizleme en son kaydedilen yazı bilgilerini gösterir; değişiklikleri kaydedip düzenleyiciyi yeniden açarak kontrol edin. Varsayılan şablon daha sonra değiştirilirse özel metni olmayan yazıların önizlemesi de değişir.
+
+Yazının **öne çıkan görseli**, ileride gönderim için kullanılacak olası görsel kaynağıdır; bu sürümde görsel çekme, yükleme veya gönderme işlemi yapılmaz. Platformların bağlantı, görsel ve etiket kuralları farklıdır; gerçek entegrasyon eklendiğinde ayrıca doğrulanacaktır.
+
+## Planlar ve takvim
+
+Yazı kutusundaki tarih ve saat seçili tüm platformlar için ortaktır ve WordPress'in **Ayarlar → Genel** ekranındaki saat dilimindedir. Yazıyı kaydettikten sonra tarihi **Social Publisher → WP Post Schedules** listesinde ve **Calendar** takviminde görebilirsiniz. Taslak yazılar ve platform seçilmemiş planlar da gösterilir. Tarih belirtmek veya yazıyı yayımlamak, bu deneme sürümünde hiçbir yere gönderim başlatmaz.
+
+Kutuyu göremiyorsanız yazı düzenleyicisinin sağ üstündeki **Tercihler / Paneller** bölümünü kontrol edin. Menü ve şablon ayarları site yöneticileri tarafından kullanılabilir.
 
 ## Uyumluluk
 
-Eklenti PHP 8.0+ ve WordPress 6.2+ hedeflenerek hazırlanmıştır. İlk doğrulama ortamı PHP 8.5.12 ve WordPress 7.1.4'tür; eklentiyi etkinleştirmeden önce yedek veya deneme sitesi kullanmanız önerilir.
-
-## Sonraki adımlar
-
-Önce bu arayüzü sitenizde deneyip geri bildirim verin. Sonraki sürümlerde güvenli hesap bağlantısı, gerçek platform API'leri, kuyruk ve gönderim durumları eklenecek. API erişimi platform izinlerine ve hesap türüne bağlıdır.
+PHP 8.0 ve WordPress 6.2 veya üzeri hedeflenmektedir. PHP 8.5.12 ve WordPress 7.1.4 kullandığınızı belirttiniz; bu ortamda uyumluluk henüz doğrulanmadı. Lütfen önce deneme sitesinde kullanın.

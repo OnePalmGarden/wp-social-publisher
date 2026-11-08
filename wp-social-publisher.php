@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Social Publisher
  * Description: Yazılar için platform bazlı sosyal paylaşım metinleri ve planlama taslağı.
- * Version: 0.1.0
+ * Version: 0.2.0
  * Requires at least: 6.2
  * Requires PHP: 8.0
  * Author: OnePalmGarden
@@ -12,6 +12,45 @@
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
+}
+
+require_once __DIR__ . '/includes/admin.php';
+
+function wsp_platforms(): array {
+	return array(
+		'facebook'  => 'Facebook',
+		'instagram' => 'Instagram',
+		'linkedin'  => 'LinkedIn',
+		'medium'    => 'Medium',
+		'substack'  => 'Substack',
+	);
+}
+
+function wsp_template( string $platform ): string {
+	$templates = get_option( 'wsp_templates', array() );
+	if ( is_array( $templates ) && isset( $templates[ $platform ] ) && is_string( $templates[ $platform ] ) ) {
+		return $templates[ $platform ];
+	}
+	return "{title}\n\n{excerpt}\n\n{url}\n\n{tags}";
+}
+
+function wsp_render_template( string $template, WP_Post $post ): string {
+	$tags = get_the_tags( $post->ID );
+	$tag_names = array();
+	if ( is_array( $tags ) ) {
+		foreach ( $tags as $tag ) {
+			$tag_names[] = $tag->name;
+		}
+	}
+	return strtr(
+		$template,
+		array(
+			'{title}'   => get_the_title( $post ),
+			'{excerpt}' => wp_strip_all_tags( get_the_excerpt( $post ) ),
+			'{url}'     => get_permalink( $post ),
+			'{tags}'    => implode( ', ', $tag_names ),
+		)
+	);
 }
 
 /**
@@ -33,15 +72,11 @@ add_action( 'add_meta_boxes', 'wsp_register_share_metabox' );
  * @param WP_Post $post Current post.
  */
 function wsp_render_share_metabox( WP_Post $post ): void {
-	$platforms = array(
-		'facebook'  => 'Facebook',
-		'instagram' => 'Instagram',
-		'medium'    => 'Medium',
-		'substack'  => 'Substack',
-	);
+	$platforms = wsp_platforms();
 	wp_nonce_field( 'wsp_save_share_settings', 'wsp_share_nonce' );
 	?>
-	<p><?php esc_html_e( 'Her platform için paylaşım hedefini ve metnini ayrı ayrı belirleyin.', 'wp-social-publisher' ); ?></p>
+	<p><?php esc_html_e( 'Platformları seçin. Yazıya özel metni boş bırakırsanız o platformun varsayılan şablonu kullanılır. Alanlarda {title}, {excerpt}, {url} ve {tags} kullanabilirsiniz.', 'wp-social-publisher' ); ?></p>
+	<p><?php esc_html_e( 'Önizleme en son kaydedilen yazı bilgilerine dayanır. Öne çıkan görsel, ileride gönderim için kullanılacak görsel kaynağıdır; bu sürümde görsel gönderilmez.', 'wp-social-publisher' ); ?></p>
 	<div class="wsp-platform-list">
 		<?php foreach ( $platforms as $key => $label ) : ?>
 			<?php
@@ -55,16 +90,20 @@ function wsp_render_share_metabox( WP_Post $post ): void {
 					<?php esc_html_e( 'Bu yazıyı bu platform için hazırla', 'wp-social-publisher' ); ?>
 				</label>
 				<p style="margin-bottom: 0;">
-					<label for="wsp-<?php echo esc_attr( $key ); ?>-text"><?php esc_html_e( 'Paylaşım metni', 'wp-social-publisher' ); ?></label>
+					<label for="wsp-<?php echo esc_attr( $key ); ?>-text"><?php esc_html_e( 'Yazıya özel metin (isteğe bağlı)', 'wp-social-publisher' ); ?></label>
 					<textarea id="wsp-<?php echo esc_attr( $key ); ?>-text" name="wsp_platforms[<?php echo esc_attr( $key ); ?>][text]" rows="3" class="widefat"><?php echo esc_textarea( $text ); ?></textarea>
 				</p>
+				<details style="margin-top: 10px;">
+					<summary><?php esc_html_e( 'Kaydedilmiş metnin önizlemesi', 'wp-social-publisher' ); ?></summary>
+					<p style="white-space: pre-wrap;"><?php echo esc_html( wsp_render_template( '' !== $text ? $text : wsp_template( $key ), $post ) ); ?></p>
+				</details>
 			</fieldset>
 		<?php endforeach; ?>
 	</div>
 	<p>
 		<label for="wsp-scheduled-at"><strong><?php esc_html_e( 'Planlanan tarih ve saat', 'wp-social-publisher' ); ?></strong></label><br>
 		<input type="datetime-local" id="wsp-scheduled-at" name="wsp_scheduled_at" value="<?php echo esc_attr( (string) get_post_meta( $post->ID, '_wsp_scheduled_at', true ) ); ?>">
-		<span class="description"><?php esc_html_e( 'WordPress sitenizin saat dilimi kullanılır.', 'wp-social-publisher' ); ?></span>
+		<span class="description"><?php esc_html_e( 'Seçili tüm platformlar için ortak tarih; WordPress sitenizin saat dilimi kullanılır.', 'wp-social-publisher' ); ?></span>
 	</p>
 	<p><strong><?php esc_html_e( 'Deneme sürümü:', 'wp-social-publisher' ); ?></strong> <?php esc_html_e( 'Bu sürüm seçimleri kaydeder; sosyal platformlara gönderim yapmaz.', 'wp-social-publisher' ); ?></p>
 	<?php
@@ -74,7 +113,7 @@ function wsp_render_share_metabox( WP_Post $post ): void {
  * Save validated sharing settings from the post editor.
  */
 function wsp_save_share_metabox( int $post_id ): void {
-	if ( ! isset( $_POST['wsp_share_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wsp_share_nonce'] ) ), 'wsp_save_share_settings' ) ) {
+	if ( ! isset( $_POST['wsp_share_nonce'] ) || ! is_string( $_POST['wsp_share_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['wsp_share_nonce'] ) ), 'wsp_save_share_settings' ) ) {
 		return;
 	}
 
@@ -86,7 +125,7 @@ function wsp_save_share_metabox( int $post_id ): void {
 		return;
 	}
 
-	$platforms = array( 'facebook', 'instagram', 'medium', 'substack' );
+	$platforms = array_keys( wsp_platforms() );
 	$submitted = isset( $_POST['wsp_platforms'] ) && is_array( $_POST['wsp_platforms'] )
 		? wp_unslash( $_POST['wsp_platforms'] )
 		: array();
