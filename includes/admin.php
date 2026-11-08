@@ -5,11 +5,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 function wsp_admin_menu(): void {
-	add_menu_page( 'Social Publisher', 'Social Publisher', 'manage_options', 'wsp-accounts', 'wsp_placeholder_page', 'dashicons-share', 26 );
-	add_submenu_page( 'wsp-accounts', 'Hesaplar', 'Accounts', 'manage_options', 'wsp-accounts', 'wsp_placeholder_page' );
+	add_menu_page( 'Social Publisher', 'Social Publisher', 'manage_options', 'wsp-accounts', 'wsp_accounts_page', 'dashicons-share', 26 );
+	add_submenu_page( 'wsp-accounts', 'Hesaplar', 'Accounts', 'manage_options', 'wsp-accounts', 'wsp_accounts_page' );
 	add_submenu_page( 'wsp-accounts', 'Otomatik paylaşım', 'WP Auto Post', 'manage_options', 'wsp-auto-post', 'wsp_placeholder_page' );
 	add_submenu_page( 'wsp-accounts', 'Yazı planları', 'WP Post Schedules', 'manage_options', 'wsp-schedules', 'wsp_schedules_page' );
-	add_submenu_page( 'wsp-accounts', 'Şimdi paylaş', 'Share Now', 'manage_options', 'wsp-share-now', 'wsp_placeholder_page' );
+	add_submenu_page( 'wsp-accounts', 'Şimdi paylaş', 'Share Now', 'manage_options', 'wsp-share-now', 'wsp_share_now_page' );
 	add_submenu_page( 'wsp-accounts', 'Takvim', 'Calendar', 'manage_options', 'wsp-calendar', 'wsp_calendar_page' );
 	add_submenu_page( 'wsp-accounts', 'Şablonlar', 'Templates', 'manage_options', 'wsp-templates', 'wsp_templates_page' );
 	add_submenu_page( 'wsp-accounts', 'Kayıtlar', 'Logs', 'manage_options', 'wsp-logs', 'wsp_placeholder_page' );
@@ -27,7 +27,7 @@ function wsp_admin_assets( string $hook_suffix ): void {
 add_action( 'admin_enqueue_scripts', 'wsp_admin_assets' );
 
 function wsp_notice(): void {
-	echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Deneme sürümü: Bu eklenti henüz hesaplara bağlanmaz, otomatik paylaşım yapmaz ve gönderim kuyruğu çalıştırmaz. Tarihler yalnızca plan taslağıdır.', 'wp-social-publisher' ) . '</p></div>';
+	echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Deneme sürümü: Yalnızca Facebook Sayfasına elle onaylanan gönderim kullanılabilir. Otomatik paylaşım ve gönderim kuyruğu yoktur; tarihler yalnızca plan taslağıdır.', 'wp-social-publisher' ) . '</p></div>';
 }
 
 function wsp_placeholder_page(): void {
@@ -36,7 +36,7 @@ function wsp_placeholder_page(): void {
 		'wsp-accounts'  => array( 'Accounts / Hesaplar', 'Hesap bağlantısı henüz eklenmedi. Bu sayfaya şifre veya erişim anahtarı girilmez.' ),
 		'wsp-auto-post' => array( 'WP Auto Post / Otomatik paylaşım', 'Otomatik paylaşım henüz kullanılamıyor.' ),
 		'wsp-share-now' => array( 'Share Now / Şimdi paylaş', 'Anında paylaşım henüz kullanılamıyor.' ),
-		'wsp-logs'      => array( 'Logs / Kayıtlar', 'Gönderim özelliği henüz bulunmadığından gönderim kayıtları oluşmaz.' ),
+		'wsp-logs'      => array( 'Logs / Kayıtlar', 'Kalıcı gönderim geçmişi henüz eklenmedi. Facebook gönderiminin sonucu Şimdi paylaş ekranında gösterilir.' ),
 	);
 	if ( ! isset( $pages[ $page ] ) ) {
 		return;

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Social Publisher
  * Description: Yazılar için platform bazlı sosyal paylaşım metinleri ve planlama taslağı.
- * Version: 0.3.0
+ * Version: 0.4.0
  * Requires at least: 6.2
  * Requires PHP: 8.0
  * Author: OnePalmGarden
@@ -15,6 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 require_once __DIR__ . '/includes/admin.php';
+require_once __DIR__ . '/includes/facebook.php';
 
 function wsp_platforms(): array {
 	return array(
@@ -67,7 +68,7 @@ function wsp_template( string $platform ): string {
 	return implode( "\n\n", array_filter( wsp_template_fields( $platform ), static fn( $field ) => '' !== trim( $field ) ) );
 }
 
-function wsp_render_template( string $template, WP_Post $post ): string {
+function wsp_template_values( WP_Post $post ): array {
 	$tags = get_the_tags( $post->ID );
 	$tag_names = array();
 	if ( is_array( $tags ) ) {
@@ -75,17 +76,35 @@ function wsp_render_template( string $template, WP_Post $post ): string {
 			$tag_names[] = $tag->name;
 		}
 	}
-	return strtr(
-		$template,
-		array(
+	return array(
 			'{title}'   => get_the_title( $post ),
 			'{excerpt}' => wp_strip_all_tags( get_the_excerpt( $post ) ),
 			'{url}'     => get_permalink( $post ),
 			'{tags}'    => implode( ', ', $tag_names ),
 			'{site_title}' => get_bloginfo( 'name' ),
-		)
 	);
 }
+
+function wsp_render_template( string $template, WP_Post $post ): string {
+	return strtr( $template, wsp_template_values( $post ) );
+}
+
+function wsp_x_character_count( string $text ): int {
+	$count = preg_match_all( '/./us', $text );
+	return false === $count ? 0 : $count;
+}
+
+function wsp_editor_assets( string $hook_suffix ): void {
+	if ( ! in_array( $hook_suffix, array( 'post.php', 'post-new.php' ), true ) ) {
+		return;
+	}
+	$screen = get_current_screen();
+	if ( ! $screen || 'post' !== $screen->post_type ) {
+		return;
+	}
+	wp_enqueue_script( 'wsp-post-preview', plugin_dir_url( __FILE__ ) . 'assets/post-preview.js', array(), '0.4.0', true );
+}
+add_action( 'admin_enqueue_scripts', 'wsp_editor_assets' );
 
 /**
  * Register the sharing editor box for blog posts.
@@ -116,8 +135,9 @@ function wsp_render_share_metabox( WP_Post $post ): void {
 			<?php
 			$enabled = (bool) get_post_meta( $post->ID, '_wsp_' . $key . '_enabled', true );
 			$text    = (string) get_post_meta( $post->ID, '_wsp_' . $key . '_text', true );
+			$preview = wsp_render_template( '' !== $text ? $text : wsp_template( $key ), $post );
 			?>
-			<fieldset style="margin: 0 0 16px; padding: 12px; border: 1px solid #dcdcde;">
+			<fieldset <?php if ( 'x' === $key ) : ?>class="wsp-x-preview" data-template="<?php echo esc_attr( wsp_template( $key ) ); ?>" data-values="<?php echo esc_attr( wp_json_encode( wsp_template_values( $post ) ) ); ?>"<?php endif; ?> style="margin: 0 0 16px; padding: 12px; border: 1px solid #dcdcde;">
 				<legend style="padding: 0 6px; font-weight: 600;"><?php echo esc_html( $label ); ?></legend>
 				<label>
 					<input type="checkbox" name="wsp_platforms[<?php echo esc_attr( $key ); ?>][enabled]" value="1" <?php checked( $enabled ); ?>>
@@ -128,9 +148,17 @@ function wsp_render_share_metabox( WP_Post $post ): void {
 					<textarea id="wsp-<?php echo esc_attr( $key ); ?>-text" name="wsp_platforms[<?php echo esc_attr( $key ); ?>][text]" rows="3" class="widefat"><?php echo esc_textarea( $text ); ?></textarea>
 				</p>
 				<details style="margin-top: 10px;">
-					<summary><?php esc_html_e( 'Kaydedilmiş metnin önizlemesi', 'wp-social-publisher' ); ?></summary>
-					<p style="white-space: pre-wrap;"><?php echo esc_html( wsp_render_template( '' !== $text ? $text : wsp_template( $key ), $post ) ); ?></p>
+					<summary><?php esc_html_e( 'Metnin önizlemesi', 'wp-social-publisher' ); ?></summary>
+					<p class="wsp-post-preview-text" style="white-space: pre-wrap;"><?php echo esc_html( $preview ); ?></p>
 				</details>
+				<?php if ( 'x' === $key ) : ?>
+					<?php $count = wsp_x_character_count( $preview ); ?>
+					<p class="wsp-x-count" aria-live="polite">
+						<?php echo esc_html( sprintf( __( 'Tahmini karakter sayısı: %1$d / %2$d', 'wp-social-publisher' ), $count, 140 ) ); ?>
+						<?php if ( $count > 140 ) : ?> <strong><?php esc_html_e( '140 karakterlik hedef aşıldı.', 'wp-social-publisher' ); ?></strong><?php endif; ?>
+					</p>
+					<p class="description"><?php esc_html_e( 'Başlık, özet, bağlantı ve etiketler dahil tüm metindeki Unicode karakterleri sayar; X bağlantı ve emojileri farklı hesaplayabilir. Yazı bilgileri son kaydedilen sürümdendir.', 'wp-social-publisher' ); ?></p>
+				<?php endif; ?>
 			</fieldset>
 		<?php endforeach; ?>
 	</div>
