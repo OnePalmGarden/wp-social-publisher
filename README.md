@@ -4,7 +4,7 @@ WordPress yazıları için Twitter / X, LinkedIn, Facebook, Medium ve Substack p
 
 ## Önemli: Bu bir önizleme sürümüdür
 
-Sürüm 0.4.0, Facebook Sayfasına tek tek ve açık onayla metin + bağlantı gönderme denemesi içerir. Otomatik gönderim kuyruğu çalıştırmaz; plan tarihi yalnızca WordPress'te saklanır ve takvimde gösterilir. Diğer platformlarla hesap bağlantısı veya gerçek gönderim henüz yoktur. Facebook bağlantısı, WordPress yönetiminde bir **Sayfa erişim belirteci** gerektirir; kişisel Facebook şifrenizi veya belirtecinizi sohbet üzerinden paylaşmayın.
+Sürüm 0.4.1, Facebook Sayfasına tek tek ve açık onayla metin + bağlantı gönderme denemesi içerir. Otomatik gönderim kuyruğu çalıştırmaz; plan tarihi yalnızca WordPress'te saklanır ve takvimde gösterilir. Diğer platformlarla hesap bağlantısı veya gerçek gönderim henüz yoktur. Facebook bağlantısı, WordPress yönetiminde bir **Sayfa erişim belirteci** gerektirir; kişisel Facebook şifrenizi veya belirtecinizi sohbet üzerinden paylaşmayın.
 
 ## Kurulum ve güncelleme
 
@@ -44,7 +44,7 @@ Bu bir tahmindir: X, bağlantıları ve bazı Unicode karakterlerini farklı ağ
 1. Meta for Developers'da bir uygulama oluşturun ve **Graph API Explorer** üzerinden o uygulamayı seçin. Meta arayüzü zamanla değişebilir.
 2. Kendi kullanıcı hesabınız için gerekli Sayfa izinleriyle bir kullanıcı belirteci oluşturun. Meta, Sayfa listeleme ve gönderme için genellikle `pages_show_list`, `pages_read_engagement` ve `pages_manage_posts` izinlerini ve uygun uygulama/Sayfa rollerini gerektirir. Geliştirme modundaki uygulamalarda test hesabının uygulamada uygun rolü olmalıdır; başkalarının hesaplarına erişim için Meta incelemesi gerekebilir.
 3. Explorer'da `GET /me/accounts?fields=id,name,access_token` isteğiyle yönettiğiniz Sayfaları listeleyin. İstediğiniz Sayfanın `id` ve `access_token` değerlerini kullanın. Bu yanıtta gizli belirteçler bulunur; ekran görüntüsünü veya değerleri kimseyle paylaşmayın.
-4. HTTPS üzerinden WordPress yönetiminde **Social Publisher → Accounts** ekranına Sayfa kimliğini ve **Sayfa** erişim belirtecini girin. Uygulama belirtecin sahibinin Sayfa kimliğiyle eşleştiğini doğrular; bu kontrol gönderme iznini garanti etmez. Süresi biten veya iptal edilen belirteçler yeniden girilmelidir.
+4. HTTPS üzerinden WordPress yönetiminde **Social Publisher → Accounts** ekranında soldan **Facebook** seçin ve Sayfa kimliğini ve **Sayfa** erişim belirtecini girin. Uygulama belirtecin sahibinin Sayfa kimliğiyle eşleştiğini doğrular; bu kontrol gönderme iznini garanti etmez. Süresi biten veya iptal edilen belirteçler yeniden girilmelidir. Twitter / X, LinkedIn, Medium ve Substack bölümleri bilgilendirme ekranlarıdır; hesap bağlantısı henüz desteklenmez.
 5. Şifresiz, herkese açık yayımlanmış bir yazı hazırlayın. Facebook özel metni boşsa Facebook şablonu kullanılır; doluysa özel metin kullanılır.
 6. **Social Publisher → Share Now** ekranında yazıyı seçin. Gösterilen mesajı, bağlantıyı ve hedef Sayfayı kontrol edin. Yalnızca **Onayla ve Facebook’ta paylaş** düğmesi gerçek gönderim başlatır. Yazı seçimi, plan tarihi ve yazıyı yayımlamak kendiliğinden gönderim başlatmaz.
 

@@ -97,14 +97,30 @@ function wsp_facebook_notice(): void {
 }
 
 function wsp_accounts_page(): void {
+	$platforms = wsp_platforms();
+	$platform = isset( $_GET['platform'] ) && is_string( $_GET['platform'] ) ? sanitize_key( wp_unslash( $_GET['platform'] ) ) : 'facebook';
+	if ( ! isset( $platforms[ $platform ] ) ) {
+		$platform = 'facebook';
+	}
 	$account = get_option( 'wsp_facebook_account', array() );
 	?>
 	<div class="wrap">
 		<h1><?php esc_html_e( 'Accounts / Hesaplar', 'wp-social-publisher' ); ?></h1>
 		<?php wsp_facebook_notice(); wsp_notice(); ?>
-		<h2><?php esc_html_e( 'Facebook Sayfası', 'wp-social-publisher' ); ?></h2>
+		<p><?php esc_html_e( 'Bir platform seçerek hesap bağlantısı ayrıntılarını görüntüleyin.', 'wp-social-publisher' ); ?></p>
+		<div class="wsp-accounts-grid">
+			<nav class="wsp-template-platforms" aria-label="<?php esc_attr_e( 'Hesap platformları', 'wp-social-publisher' ); ?>">
+				<h2><?php esc_html_e( 'Platform', 'wp-social-publisher' ); ?></h2>
+				<?php foreach ( $platforms as $key => $label ) : ?>
+					<a class="wsp-platform-tab<?php echo $platform === $key ? ' is-active' : ''; ?>" href="<?php echo esc_url( add_query_arg( 'platform', $key, admin_url( 'admin.php?page=wsp-accounts' ) ) ); ?>" <?php echo $platform === $key ? 'aria-current="page"' : ''; ?>><?php echo esc_html( $label ); ?></a>
+				<?php endforeach; ?>
+			</nav>
+			<section class="wsp-template-fields" aria-labelledby="wsp-account-heading">
+				<?php if ( 'facebook' === $platform ) : ?>
+		<h2 id="wsp-account-heading"><?php esc_html_e( 'Facebook Sayfası', 'wp-social-publisher' ); ?></h2>
 		<?php if ( is_array( $account ) && ! empty( $account['page_id'] ) ) : ?>
 			<p><?php echo esc_html( sprintf( __( 'Kayıtlı Sayfa: %1$s (ID: %2$s)', 'wp-social-publisher' ), $account['name'], $account['page_id'] ) ); ?></p>
+			<p class="description"><?php esc_html_e( 'Sayfa kaydedildi; erişim belirtecinin ve paylaşım yetkisinin güncel durumu burada kontrol edilmez.', 'wp-social-publisher' ); ?></p>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<input type="hidden" name="action" value="wsp_facebook_disconnect">
 				<?php wp_nonce_field( 'wsp_facebook_disconnect' ); ?>
@@ -124,6 +140,13 @@ function wsp_accounts_page(): void {
 				<?php submit_button( __( 'Sayfayı doğrula ve bağla', 'wp-social-publisher' ) ); ?>
 			</form>
 		<?php endif; ?>
+				<?php else : ?>
+					<h2 id="wsp-account-heading"><?php echo esc_html( $platforms[ $platform ] ); ?></h2>
+					<p><strong><?php esc_html_e( 'Bağlantı henüz kullanılamıyor', 'wp-social-publisher' ); ?></strong></p>
+					<p><?php esc_html_e( 'Bu platform için hesap doğrulama, kaydetme ve gönderim özellikleri henüz geliştirilmedi. Şimdilik herhangi bir hesap bilgisi girilmez veya kaydedilmez.', 'wp-social-publisher' ); ?></p>
+				<?php endif; ?>
+			</section>
+		</div>
 	</div>
 	<?php
 }

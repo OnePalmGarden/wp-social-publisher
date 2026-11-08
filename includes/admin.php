@@ -17,12 +17,18 @@ function wsp_admin_menu(): void {
 add_action( 'admin_menu', 'wsp_admin_menu' );
 
 function wsp_admin_assets( string $hook_suffix ): void {
-	if ( ! isset( $_GET['page'] ) || ! is_string( $_GET['page'] ) || 'wsp-templates' !== sanitize_key( wp_unslash( $_GET['page'] ) ) ) {
+	if ( ! isset( $_GET['page'] ) || ! is_string( $_GET['page'] ) ) {
+		return;
+	}
+	$page = sanitize_key( wp_unslash( $_GET['page'] ) );
+	if ( ! in_array( $page, array( 'wsp-templates', 'wsp-accounts' ), true ) ) {
 		return;
 	}
 	$base_url = plugin_dir_url( dirname( __DIR__ ) . '/wp-social-publisher.php' );
-	wp_enqueue_style( 'wsp-templates', $base_url . 'assets/templates.css', array(), '0.3.0' );
-	wp_enqueue_script( 'wsp-templates', $base_url . 'assets/templates.js', array(), '0.3.0', true );
+	wp_enqueue_style( 'wsp-templates', $base_url . 'assets/templates.css', array(), '0.4.1' );
+	if ( 'wsp-templates' === $page ) {
+		wp_enqueue_script( 'wsp-templates', $base_url . 'assets/templates.js', array(), '0.3.0', true );
+	}
 }
 add_action( 'admin_enqueue_scripts', 'wsp_admin_assets' );
 

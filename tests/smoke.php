@@ -32,7 +32,7 @@ class WP_Query {
 function add_action( ...$args ) {}
 function get_option( $key, $default = false ) { return $GLOBALS['options'][ $key ] ?? $default; }
 function update_option( $key, $value, $autoload = null ) { $GLOBALS['options'][ $key ] = $value; return true; }
-function is_ssl() { return true; }
+function is_ssl() { return $GLOBALS['ssl'] ?? true; }
 function get_post_meta( $id, $key, $single = false ) { return $GLOBALS['meta'][ $id ][ $key ] ?? ''; }
 function update_post_meta( $id, $key, $value ) { $GLOBALS['meta'][ $id ][ $key ] = $value; }
 function delete_post_meta( $id, $key ) { unset( $GLOBALS['meta'][ $id ][ $key ] ); }
@@ -51,6 +51,7 @@ function check_admin_referer( $action ) { if ( ! $GLOBALS['nonce_valid'] ) { thr
 function set_transient( $key, $value, $expiry ) { $GLOBALS['transients'][ $key ] = $value; return true; }
 function get_transient( $key ) { return $GLOBALS['transients'][ $key ] ?? false; }
 function delete_transient( $key ) { unset( $GLOBALS['transients'][ $key ] ); }
+function delete_option( $key ) { unset( $GLOBALS['options'][ $key ] ); return true; }
 function wp_safe_redirect( $url ) { throw new RuntimeException( 'redirect: ' . $url ); }
 function wp_generate_password( $length, $special, $extra ) { return str_repeat( 'a', $length ); }
 function wp_http_validate_url( $url ) { return filter_var( $url, FILTER_VALIDATE_URL ); }
@@ -230,6 +231,32 @@ wsp_templates_page();
 $template_page = ob_get_clean();
 expect( str_contains( $template_page, 'Akıllı etiketleri göster' ) && str_contains( $template_page, 'data-smart-tag="{title}"' ), 'Akıllı etiketleri gösterip ekleyebilmeli' );
 expect( str_contains( $template_page, 'wsp-template-grid' ) && str_contains( $template_page, 'wsp-preview-text' ), 'Üç bölümlü düzen ve önizleme bulunmalı' );
+
+$_GET = array( 'page' => 'wsp-accounts' );
+$GLOBALS['enqueued'] = array();
+wsp_admin_assets( 'unused-hook-name' );
+expect( 1 === count( $GLOBALS['enqueued'] ) && str_contains( $GLOBALS['enqueued'][0], 'templates.css' ), 'Hesaplar sayfası ortak stili yüklemeli' );
+ob_start();
+wsp_accounts_page();
+$accounts_page = ob_get_clean();
+expect( str_contains( $accounts_page, 'wsp-accounts-grid' ) && str_contains( $accounts_page, 'wsp_facebook_connect' ) && str_contains( $accounts_page, 'wsp_facebook_disconnect' ), 'Facebook bağlantı ve kaldırma formları korunmalı' );
+expect( str_contains( $accounts_page, 'Kayıtlı Sayfa: Sayfa' ) && ! str_contains( $accounts_page, 'secret-token' ), 'Hesap bilgisi belirteç gösterilmeden sunulmalı' );
+expect( str_contains( $accounts_page, 'güncel durumu burada kontrol edilmez' ), 'Bağlantı durumu güncel olarak sunulmamalı' );
+foreach ( array( 'x', 'linkedin', 'medium', 'substack' ) as $platform ) {
+	$_GET['platform'] = $platform;
+	ob_start();
+	wsp_accounts_page();
+	$accounts_page = ob_get_clean();
+	expect( str_contains( $accounts_page, wsp_platforms()[ $platform ] ) && str_contains( $accounts_page, 'Bağlantı henüz kullanılamıyor' ), 'Desteklenmeyen platform durumu gösterilmeli: ' . $platform );
+	expect( ! str_contains( $accounts_page, 'wsp_facebook_connect' ) && ! str_contains( $accounts_page, 'page_token' ), 'Başka platformda Facebook formu gösterilmemeli' );
+}
+$_GET['platform'] = 'gecersiz';
+$GLOBALS['ssl'] = false;
+ob_start();
+wsp_accounts_page();
+$accounts_page = ob_get_clean();
+expect( str_contains( $accounts_page, 'HTTPS gereklidir' ) && ! str_contains( $accounts_page, 'name="page_token"' ), 'Geçersiz platform varsayılan Facebook ekranına dönmeli; HTTPS yoksa form gösterilmemeli' );
+$GLOBALS['ssl'] = true;
 
 $GLOBALS['posts'] = array( $post );
 $_GET = array( 'month' => '2026-11' );
