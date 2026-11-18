@@ -37,7 +37,7 @@ function wsp_admin_assets( string $hook_suffix ): void {
 		return;
 	}
 	$base_url = plugin_dir_url( dirname( __DIR__ ) . '/wp-social-publisher.php' );
-	wp_enqueue_style( 'wsp-templates', $base_url . 'assets/templates.css', array(), '0.9.4' );
+	wp_enqueue_style( 'wsp-templates', $base_url . 'assets/templates.css', array(), '0.9.5' );
 	if ( 'wsp-templates' === $page ) {
 		wp_enqueue_script( 'wsp-templates', $base_url . 'assets/templates.js', array(), '0.9.1', true );
 	}

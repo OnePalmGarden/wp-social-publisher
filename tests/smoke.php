@@ -543,7 +543,7 @@ try {
 	expect( str_starts_with( $error->getMessage(), 'redirect:' ), 'Başarılı LinkedIn gönderimi yönlendirmeli' );
 }
 expect( 'https://api.linkedin.com/rest/posts' === $GLOBALS['request'][0], 'LinkedIn Posts API kullanılmalı' );
-expect( 'Bearer li-access' === $GLOBALS['request'][1]['headers']['Authorization'] && '202511' === $GLOBALS['request'][1]['headers']['LinkedIn-Version'], 'LinkedIn istek belirteci ve API sürümü başlıklarını kullanmalı' );
+expect( 'Bearer li-access' === $GLOBALS['request'][1]['headers']['Authorization'] && wsp_linkedin_default_version() === $GLOBALS['request'][1]['headers']['LinkedIn-Version'], 'LinkedIn istek belirteci ve API sürümü başlıklarını kullanmalı' );
 $linkedin_payload = json_decode( $GLOBALS['request'][1]['body'], true );
 expect( 'urn:li:person:li-123' === $linkedin_payload['author'] && 'PUBLISHED' === $linkedin_payload['lifecycleState'], 'LinkedIn API yükü doğru yazarla yayınlanmalı' );
 expect( isset( $linkedin_payload['content']['media']['id'] ) && 'urn:li:image:test-image' === $linkedin_payload['content']['media']['id'], 'LinkedIn postu yüklenen öne çıkan görseli kullanmalı' );
@@ -551,7 +551,18 @@ $linkedin_requests = array_slice( $GLOBALS['request_history'], -3 );
 $image_init = json_decode( $linkedin_requests[0][1]['body'], true );
 expect( 'https://api.linkedin.com/rest/images?action=initializeUpload' === $linkedin_requests[0][0] && 'urn:li:person:li-123' === $image_init['initializeUploadRequest']['owner'], 'LinkedIn görseli doğru yazarla resmi Images API üzerinden başlatılmalı' );
 expect( 'PUT' === $linkedin_requests[1][1]['method'] && 'image/jpeg' === $linkedin_requests[1][1]['headers']['Content-Type'] && 'test image bytes' === $linkedin_requests[1][1]['body'], 'LinkedIn görsel yüklemesi doğru HTTP metodu ve MIME ile yapılmalı' );
-expect( '202511' === $linkedin_requests[0][1]['headers']['LinkedIn-Version'] && '202511' === $linkedin_requests[2][1]['headers']['LinkedIn-Version'], 'LinkedIn Images ve Posts API istekleri aynı sürümü kullanmalı' );
+expect( wsp_linkedin_default_version() === $linkedin_requests[0][1]['headers']['LinkedIn-Version'] && wsp_linkedin_default_version() === $linkedin_requests[2][1]['headers']['LinkedIn-Version'], 'LinkedIn Images ve Posts API istekleri aynı sürümü kullanmalı' );
+$GLOBALS['options']['wsp_linkedin_api_version'] = '202511';
+$GLOBALS['request_history'] = array();
+$GLOBALS['response_queue'] = array(
+	array( 'code' => 426, 'body' => '{"message":"Requested version 20251101 is not active"}', 'headers' => array() ),
+	array( 'code' => 201, 'body' => '{}', 'headers' => array( 'x-restli-id' => 'urn:li:share:1' ) ),
+);
+$version_result = wsp_linkedin_request( 'https://api.linkedin.com/rest/posts', array( 'headers' => array() ) );
+expect( 201 === $version_result['code'] && '202510' === $GLOBALS['request_history'][1][1]['headers']['LinkedIn-Version'] && '202510' === get_option( 'wsp_linkedin_api_version' ), 'LinkedIn 426 alırsa önceki sürümle yeniden denemeli ve çalışan sürümü saklamalı' );
+expect( '202512' === wsp_linkedin_previous_version( '202601' ), 'LinkedIn önceki sürüm yıl geçişini doğru hesaplamalı' );
+$GLOBALS['request_history'] = array();
+$GLOBALS['response_queue'] = array();
 expect( 'Başarılı' === get_option( 'wsp_delivery_logs' )[0]['status'] && 'urn:li:share:789' === get_option( 'wsp_delivery_logs' )[0]['remote_id'], 'Başarılı LinkedIn gönderimi Logs kaydına yazılmalı' );
 expect( ! str_contains( json_encode( get_option( 'wsp_delivery_logs' ) ), 'li-access' ), 'Logs kayıtları erişim belirteci içermemeli' );
 $_GET = array(

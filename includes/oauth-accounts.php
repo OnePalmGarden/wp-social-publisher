@@ -160,6 +160,42 @@ function wsp_linkedin_api_error_detail( $response, string $access_token ): strin
 	return ' HTTP ' . (int) $status . ( '' !== $message ? ': ' . $message : '' );
 }
 
+function wsp_linkedin_default_version(): string {
+	return gmdate( 'Ym', strtotime( 'first day of -2 months' ) );
+}
+
+function wsp_linkedin_version(): string {
+	$stored = get_option( 'wsp_linkedin_api_version', '' );
+	return is_string( $stored ) && preg_match( '/^20\d{2}(0[1-9]|1[0-2])$/', $stored ) ? $stored : wsp_linkedin_default_version();
+}
+
+function wsp_linkedin_previous_version( string $version ): string {
+	$year = (int) substr( $version, 0, 4 );
+	$month = (int) substr( $version, 4, 2 ) - 1;
+	if ( 1 > $month ) {
+		$month = 12;
+		--$year;
+	}
+	return sprintf( '%04d%02d', $year, $month );
+}
+
+// LinkedIn sürümleri yaklaşık 12 ay sonra kapanır; 426 gelirse bir önceki sürüm denenir ve çalışan sürüm saklanır.
+function wsp_linkedin_request( string $url, array $args ) {
+	$version = wsp_linkedin_version();
+	for ( $attempt = 0; $attempt < 12; $attempt++ ) {
+		$args['headers']['LinkedIn-Version'] = $version;
+		$response = wp_remote_request( $url, $args );
+		if ( is_wp_error( $response ) || 426 !== (int) wp_remote_retrieve_response_code( $response ) ) {
+			if ( ! is_wp_error( $response ) && $version !== get_option( 'wsp_linkedin_api_version', '' ) && 400 > (int) wp_remote_retrieve_response_code( $response ) ) {
+				update_option( 'wsp_linkedin_api_version', $version, false );
+			}
+			return $response;
+		}
+		$version = wsp_linkedin_previous_version( $version );
+	}
+	return $response;
+}
+
 function wsp_linkedin_upload_featured_image( string $access_token, string $person_id, int $attachment_id ) {
 	$file = get_attached_file( $attachment_id );
 	if ( ! is_string( $file ) || ! is_readable( $file ) ) {
@@ -179,7 +215,7 @@ function wsp_linkedin_upload_featured_image( string $access_token, string $perso
 	if ( ! is_string( $init_body ) ) {
 		return new WP_Error( 'linkedin_image_init', 'LinkedIn görsel yükleme isteği hazırlanamadı.' );
 	}
-	$init_response = wp_remote_request(
+	$init_response = wsp_linkedin_request(
 		'https://api.linkedin.com/rest/images?action=initializeUpload',
 		array(
 			'method'      => 'POST',
@@ -189,12 +225,14 @@ function wsp_linkedin_upload_featured_image( string $access_token, string $perso
 				'Authorization'             => 'Bearer ' . $access_token,
 				'Accept'                    => 'application/json',
 				'Content-Type'              => 'application/json',
-				'LinkedIn-Version'          => '202511',
 				'X-Restli-Protocol-Version' => '2.0.0',
 			),
 			'body'        => $init_body,
 		)
 	);
+	if ( ! is_wp_error( $init_response ) && 426 === (int) wp_remote_retrieve_response_code( $init_response ) ) {
+		return new WP_Error( 'linkedin_version', 'LinkedIn API sürümü doğrulanamadı; denenen sürümlerin hiçbiri aktif değil.' . wsp_linkedin_api_error_detail( $init_response, $access_token ) );
+	}
 	if ( is_wp_error( $init_response ) || 200 !== wp_remote_retrieve_response_code( $init_response ) ) {
 		return new WP_Error( 'linkedin_image_init_failed', 'LinkedIn görsel yüklemesini başlatamadı.' . wsp_linkedin_api_error_detail( $init_response, $access_token ) . ' Görsel izni ve Share on LinkedIn ürün erişimini kontrol edin.' );
 	}
@@ -261,7 +299,7 @@ function wsp_linkedin_publish_post( string $access_token, string $person_id, str
 	if ( ! is_string( $body ) ) {
 		return new WP_Error( 'linkedin_invalid_post', 'Gönderi metni LinkedIn için kodlanamadı.' );
 	}
-	$response = wp_remote_request(
+	$response = wsp_linkedin_request(
 		'https://api.linkedin.com/rest/posts',
 		array(
 			'method'      => 'POST',
@@ -271,7 +309,6 @@ function wsp_linkedin_publish_post( string $access_token, string $person_id, str
 				'Authorization'             => 'Bearer ' . $access_token,
 				'Accept'                    => 'application/json',
 				'Content-Type'              => 'application/json',
-				'LinkedIn-Version'          => '202511',
 				'X-Restli-Protocol-Version' => '2.0.0',
 			),
 			'body'        => $body,
@@ -282,6 +319,9 @@ function wsp_linkedin_publish_post( string $access_token, string $person_id, str
 	}
 	$status = wp_remote_retrieve_response_code( $response );
 	$data = json_decode( wp_remote_retrieve_body( $response ), true );
+	if ( 426 === $status ) {
+		return new WP_Error( 'linkedin_version', 'LinkedIn API sürümü doğrulanamadı; denenen sürümlerin hiçbiri aktif değil.' . wsp_linkedin_api_error_detail( $response, $access_token ) );
+	}
 	if ( 201 !== $status ) {
 		return new WP_Error( 'linkedin_publish_failed', 'LinkedIn gönderiyi kabul etmedi.' . wsp_linkedin_api_error_detail( $response, $access_token ) . ' Share on LinkedIn ürün iznini, w_member_social kapsamını ve uygulama erişimini kontrol edin. Tekrar denemeden önce hesabınızı kontrol edin.' );
 	}
